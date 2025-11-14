@@ -1,0 +1,64 @@
+# Dependencies
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Build outputs
+dist/
+dist-electron/
+release/
+out/
+
+# Build directory - keep SVG source, ignore generated files
+build/*.png
+build/*.icns
+
+# Electron
+*.dmg
+*.pkg
+*.deb
+*.rpm
+*.snap
+*.appimage
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+.vite/
+
+# OS
+Thumbs.db
+.Spotlight-V100
+.Trashes
+
+# Backup files
+*.old.*
+*.backup.*
+README.old.md

@@ -1,0 +1,60 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background gradient -->
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3B82F6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1D4ED8;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="brainGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFFFFF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#E0E7FF;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Rounded square background -->
+  <rect width="1024" height="1024" rx="220" fill="url(#bgGradient)"/>
+  
+  <!-- Brain icon -->
+  <g transform="translate(512, 512)">
+    <!-- Left hemisphere -->
+    <path d="M -150,-200 Q -250,-150 -250,-50 Q -250,50 -200,150 Q -150,200 -50,200 L -50,180 Q -130,180 -175,135 Q -220,90 -220,-50 Q -220,-130 -140,-180 Z" 
+          fill="url(#brainGradient)" stroke="#E0E7FF" stroke-width="3"/>
+    
+    <!-- Right hemisphere -->
+    <path d="M 150,-200 Q 250,-150 250,-50 Q 250,50 200,150 Q 150,200 50,200 L 50,180 Q 130,180 175,135 Q 220,90 220,-50 Q 220,-130 140,-180 Z" 
+          fill="url(#brainGradient)" stroke="#E0E7FF" stroke-width="3"/>
+    
+    <!-- Neural connections -->
+    <g opacity="0.8">
+      <!-- Vertical connections -->
+      <line x1="-80" y1="-120" x2="-80" y2="-60" stroke="#93C5FD" stroke-width="8" stroke-linecap="round"/>
+      <line x1="-80" y1="-40" x2="-80" y2="20" stroke="#93C5FD" stroke-width="8" stroke-linecap="round"/>
+      <line x1="-80" y1="40" x2="-80" y2="100" stroke="#93C5FD" stroke-width="8" stroke-linecap="round"/>
+      
+      <line x1="80" y1="-120" x2="80" y2="-60" stroke="#93C5FD" stroke-width="8" stroke-linecap="round"/>
+      <line x1="80" y1="-40" x2="80" y2="20" stroke="#93C5FD" stroke-width="8" stroke-linecap="round"/>
+      <line x1="80" y1="40" x2="80" y2="100" stroke="#93C5FD" stroke-width="8" stroke-linecap="round"/>
+      
+      <!-- Horizontal connections -->
+      <line x1="-50" y1="0" x2="50" y2="0" stroke="#93C5FD" stroke-width="8" stroke-linecap="round"/>
+      
+      <!-- Nodes -->
+      <circle cx="-80" cy="-120" r="12" fill="#DBEAFE"/>
+      <circle cx="-80" cy="-60" r="12" fill="#DBEAFE"/>
+      <circle cx="-80" cy="-40" r="12" fill="#DBEAFE"/>
+      <circle cx="-80" cy="20" r="12" fill="#DBEAFE"/>
+      <circle cx="-80" cy="40" r="12" fill="#DBEAFE"/>
+      <circle cx="-80" cy="100" r="12" fill="#DBEAFE"/>
+      
+      <circle cx="80" cy="-120" r="12" fill="#DBEAFE"/>
+      <circle cx="80" cy="-60" r="12" fill="#DBEAFE"/>
+      <circle cx="80" cy="-40" r="12" fill="#DBEAFE"/>
+      <circle cx="80" cy="20" r="12" fill="#DBEAFE"/>
+      <circle cx="80" cy="40" r="12" fill="#DBEAFE"/>
+      <circle cx="80" cy="100" r="12" fill="#DBEAFE"/>
+      
+      <circle cx="-50" cy="0" r="12" fill="#DBEAFE"/>
+      <circle cx="50" cy="0" r="12" fill="#DBEAFE"/>
+    </g>
+  </g>
+</svg>
