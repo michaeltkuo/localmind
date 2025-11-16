@@ -13,6 +13,8 @@ export const ChatContainer: React.FC = () => {
     deleteConversation,
     exportConversation,
     stopStreaming,
+    isSearching,
+    settings,
   } = useChatStore();
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -65,6 +67,8 @@ export const ChatContainer: React.FC = () => {
           onSendMessage={handleSendMessage} 
           disabled={!modelLoaded}
           isStreaming={isStreaming}
+          isSearching={isSearching}
+          webSearchEnabled={settings.webSearchEnabled}
         />
       </div>
     );
@@ -164,6 +168,8 @@ export const ChatContainer: React.FC = () => {
         onSendMessage={handleSendMessage} 
         disabled={!modelLoaded}
         isStreaming={isStreaming}
+        isSearching={isSearching}
+        webSearchEnabled={settings.webSearchEnabled}
       />
     </div>
   );

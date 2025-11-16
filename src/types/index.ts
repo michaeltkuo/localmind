@@ -5,6 +5,13 @@ export interface Message {
   role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp: number;
+  searchResults?: SearchResult[];
+}
+
+export interface SearchResult {
+  title: string;
+  snippet: string;
+  url: string;
 }
 
 export interface Conversation {
@@ -35,6 +42,8 @@ export interface ChatSettings {
   maxTokens: number;
   topP: number;
   systemPrompt: string;
+  webSearchEnabled: boolean;
+  autoDetectSearchQueries: boolean;
 }
 
 export interface AppState {

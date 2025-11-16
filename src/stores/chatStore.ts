@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import type { Conversation, Message, ChatSettings, OllamaModel } from '../types';
 import { OllamaService } from '../services/ollama.service';
 import { StorageService } from '../services/storage.service';
+import { SearchService } from '../services/search.service';
 
 interface ChatStore {
   // State
@@ -22,6 +23,8 @@ interface ChatStore {
   isStreaming: boolean;
   error: string | null;
   abortController: AbortController | null;
+  isSearching: boolean;
+  lastSearchQuery: string | null;
 
   // Actions
   initializeApp: () => Promise<void>;
@@ -43,6 +46,8 @@ const DEFAULT_SETTINGS: ChatSettings = {
   maxTokens: 2048,
   topP: 0.9,
   systemPrompt: 'You are a helpful AI assistant.',
+  webSearchEnabled: false,
+  autoDetectSearchQueries: true,
 };
 
 export const useChatStore = create<ChatStore>((set, get) => ({
@@ -63,6 +68,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   isStreaming: false,
   abortController: null,
   error: null,
+  isSearching: false,
+  lastSearchQuery: null,
 
   // Get current model status
   getModelStatus: () => {
@@ -195,12 +202,40 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     const conversation = get().currentConversation;
     if (!conversation) return;
 
+    // Determine if we should use web search
+    const shouldSearch = settings.webSearchEnabled && 
+      (settings.autoDetectSearchQueries ? SearchService.shouldUseWebSearch(content) : true);
+
+    // Perform web search if enabled
+    let searchResults = null;
+    let enrichedContent = content;
+    
+    if (shouldSearch) {
+      set({ isSearching: true, lastSearchQuery: content });
+      
+      try {
+        searchResults = await SearchService.search(content);
+        
+        if (searchResults.results.length > 0) {
+          // Inject search context before the user's question
+          const searchContext = SearchService.formatResultsForContext(searchResults);
+          enrichedContent = `${searchContext}\n\nUser Question: ${content}`;
+        }
+      } catch (error) {
+        console.error('Search failed:', error);
+        // Continue without search results
+      } finally {
+        set({ isSearching: false });
+      }
+    }
+
     // Create user message
     const userMessage: Message = {
       id: `msg-${Date.now()}`,
       role: 'user',
       content,
       timestamp: Date.now(),
+      searchResults: searchResults?.results,
     };
 
     // Create assistant message placeholder
@@ -230,11 +265,11 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       error: null,
     });
 
-    // Prepare messages for API (excluding the empty assistant message)
+    // Prepare messages for API (using enriched content if search was performed)
     const apiMessages = [
       { id: 'system', role: 'system' as const, content: settings.systemPrompt, timestamp: Date.now() },
       ...conversation.messages,
-      userMessage,
+      { ...userMessage, content: enrichedContent },
     ];
 
     // Stream the response

@@ -25,6 +25,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
       maxTokens: 2048,
       topP: 0.9,
       systemPrompt: 'You are a helpful AI assistant.',
+      webSearchEnabled: false,
+      autoDetectSearchQueries: true,
     };
     setLocalSettings(defaultSettings);
   };
@@ -121,6 +123,72 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                 Sets the behavior and personality of the AI assistant. This is sent with every conversation.
               </p>
+            </div>
+
+            {/* Web Search Section */}
+            <div className="pt-4 border-t border-gray-200 dark:border-gray-600">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">🌐 Web Search</h3>
+              
+              {/* Enable Web Search Toggle */}
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Enable Web Search
+                  </label>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Search the internet for real-time information to supplement AI responses
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setLocalSettings({ ...localSettings, webSearchEnabled: !localSettings.webSearchEnabled })}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                    localSettings.webSearchEnabled ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-600'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      localSettings.webSearchEnabled ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* Auto-Detect Search Queries */}
+              {localSettings.webSearchEnabled && (
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Auto-Detect Search Queries
+                    </label>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      Automatically search when queries mention current events or recent information
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setLocalSettings({ ...localSettings, autoDetectSearchQueries: !localSettings.autoDetectSearchQueries })}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                      localSettings.autoDetectSearchQueries ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-600'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        localSettings.autoDetectSearchQueries ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+              )}
+
+              {localSettings.webSearchEnabled && (
+                <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                  <p className="text-xs text-blue-700 dark:text-blue-300">
+                    <strong>Privacy Note:</strong> Web search uses DuckDuckGo for privacy-friendly searches. 
+                    No personal data is tracked. Search results are injected into the conversation context.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -35,7 +35,36 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
             }`}
           >
             {isUser ? (
-              <p className="whitespace-pre-wrap break-words">{message.content}</p>
+              <>
+                <p className="whitespace-pre-wrap break-words">{message.content}</p>
+                
+                {/* Display search results if available */}
+                {message.searchResults && message.searchResults.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-blue-500">
+                    <div className="flex items-center gap-2 mb-2 text-xs text-blue-100">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                      <span>Web search used ({message.searchResults.length} result{message.searchResults.length !== 1 ? 's' : ''})</span>
+                    </div>
+                    <div className="space-y-2">
+                      {message.searchResults.map((result, index) => (
+                        <div key={index} className="text-xs bg-blue-700 rounded p-2">
+                          <a 
+                            href={result.url} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="font-medium hover:underline block mb-1"
+                          >
+                            {result.title}
+                          </a>
+                          <p className="text-blue-100 line-clamp-2">{result.snippet}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
             ) : (
               <div className="prose prose-sm dark:prose-invert max-w-none prose-pre:p-0 prose-pre:m-0">
                 <ReactMarkdown
