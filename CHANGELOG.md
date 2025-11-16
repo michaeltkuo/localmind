@@ -47,6 +47,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **🌐 Web Search Integration**: Search the internet for real-time information
+  - Privacy-focused search using DuckDuckGo (no tracking, no API key)
+  - Auto-detect queries that need current information
+  - Display search results with clickable source citations
+  - Seamless context injection into conversations
+  - Enable/disable toggle in Settings panel
+  - Auto-detect search queries option
+  - Visual indicators when search is active
+
 ### Planned
 - Windows support
 - Linux support

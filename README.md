@@ -48,17 +48,40 @@ A beautiful native desktop application for chatting with locally hosted LLM mode
 
 
 
-### ⚙️ Advanced Features```bash
+### ⚙️ Advanced Features
 
-- **Customizable Settings** - Adjust temperature, max tokens, top-p, and system prompts# macOS (using Homebrew)
-
-- **Export Conversations** - Save chats as JSON or Markdown filesbrew install ollama
-
+- **Customizable Settings** - Adjust temperature, max tokens, top-p, and system prompts
+- **Export Conversations** - Save chats as JSON or Markdown files
 - **Keyboard Shortcuts** - Fast navigation with keyboard commands
+- **Stop Generation** - Cancel long-running responses anytime
+- **Model Pre-loading** - Smart model warm-up for instant responses
+- **🌐 Web Search** - Search the internet for real-time information to supplement AI responses
 
-- **Stop Generation** - Cancel long-running responses anytime# Or download from: https://ollama.ai
+### 🌐 Web Search Integration (NEW!)
 
-- **Model Pre-loading** - Smart model warm-up for instant responses```
+LocalMind now supports internet search capability to supplement the AI's knowledge with real-time information from the web.
+
+**Features:**
+- 🔍 **Privacy-Focused Search** - Uses DuckDuckGo for searches (no tracking, no API key required)
+- 🎯 **Auto-Detection** - Automatically detects when queries need current information
+- 📚 **Source Citations** - Search results are displayed with clickable links
+- ⚡ **Seamless Integration** - Search context is injected into conversations automatically
+- 🔒 **User Control** - Enable/disable via Settings panel
+
+**How to Use:**
+1. Open Settings (⌘K or click gear icon)
+2. Scroll to "Web Search" section
+3. Toggle "Enable Web Search" ON
+4. (Optional) Enable/disable "Auto-Detect Search Queries"
+5. Start asking questions that need current information!
+
+**Use Cases:**
+- Current events: "What are the latest developments in AI?"
+- Recent tech: "What's new in TypeScript 5.4?"
+- Documentation: "How do I use React Server Components?"
+- Real-time data: "Current trends in web development"
+
+**Privacy Note:** Web searches are performed using DuckDuckGo's privacy-friendly API. No personal data is tracked.
 
 
 
