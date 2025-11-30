@@ -1,11 +1,40 @@
 // Core types for the chat application
 
+// Tool calling types
+export interface ToolCall {
+  id?: string;
+  type: 'function';
+  function: {
+    name: string;
+    arguments: string | Record<string, any>; // Can be JSON string or parsed object
+  };
+}
+
+export interface ToolCallMessage {
+  role: 'assistant';
+  content: string;
+  tool_calls: ToolCall[];
+}
+
+export interface ToolResultMessage {
+  role: 'tool';
+  content: string;
+  tool_call_id?: string;
+  name?: string; // Tool name for context
+}
+
 export interface Message {
   id: string;
-  role: 'user' | 'assistant' | 'system';
+  role: 'user' | 'assistant' | 'system' | 'tool';
   content: string;
   timestamp: number;
   searchResults?: SearchResult[];
+  tool_calls?: ToolCall[]; // For assistant messages that call tools
+  tool_call_id?: string; // For tool result messages
+  tool_name?: string; // For tool result messages
+  // UI status for assistant placeholder: searching/ thinking while awaiting content
+  status?: 'searching' | 'thinking' | 'typing';
+  lastSearchQuery?: string; // Phase 2B: Track what was searched for better UX
 }
 
 export interface SearchResult {
@@ -37,6 +66,8 @@ export interface OllamaModel {
   };
 }
 
+export type SearchMode = 'off' | 'smart' | 'auto';
+
 export interface ChatSettings {
   temperature: number;
   maxTokens: number;
@@ -44,6 +75,12 @@ export interface ChatSettings {
   systemPrompt: string;
   webSearchEnabled: boolean;
   autoDetectSearchQueries: boolean;
+  searchMode: SearchMode;
+  braveApiKey?: string;
+  // Phase 3B: Debug settings
+  debugMode?: boolean;
+  maxSearchResults?: number;
+  searchTimeout?: number;
 }
 
 export interface AppState {

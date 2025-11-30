@@ -20,55 +20,71 @@ export class SearchService {
    */
   static async search(query: string, maxResults: number = 5): Promise<SearchResponse> {
     try {
-      // Use DuckDuckGo's instant answer API
-      const encodedQuery = encodeURIComponent(query);
-      const response = await fetch(
-        `https://api.duckduckgo.com/?q=${encodedQuery}&format=json&no_html=1&skip_disambig=1`
-      );
-
-      if (!response.ok) {
-        throw new Error(`Search failed with status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      const results: SearchResult[] = [];
-
-      // Extract abstract if available
-      if (data.Abstract && data.AbstractText) {
-        results.push({
-          title: data.Heading || 'Overview',
-          snippet: data.AbstractText,
-          url: data.AbstractURL || data.AbstractSource || '',
-        });
-      }
-
-      // Extract related topics
-      if (data.RelatedTopics && Array.isArray(data.RelatedTopics)) {
-        for (const topic of data.RelatedTopics.slice(0, maxResults - results.length)) {
-          // Skip topic groups
-          if (topic.Topics) continue;
-          
-          if (topic.Text && topic.FirstURL) {
-            results.push({
-              title: topic.Text.split(' - ')[0] || 'Related',
-              snippet: topic.Text,
-              url: topic.FirstURL,
-            });
-          }
+      // Check if running in Electron with IPC available
+      // @ts-ignore - window.api is injected by preload script
+      if (typeof window !== 'undefined' && window.api?.search) {
+        // Use Electron IPC to bypass CORS
+        // @ts-ignore
+        try { console.log('[WebSearch] path: electron-ipc'); } catch {}
+        const result = await window.api.search(query, maxResults);
+        if (result.success && result.results) {
+          try { console.log('[WebSearch] electron-ipc returned', result.results.length); } catch {}
+          return {
+            query,
+            results: result.results,
+            timestamp: Date.now(),
+          };
         }
       }
 
-      // If no results from instant answer, try HTML scraping as fallback
-      if (results.length === 0) {
-        const htmlResults = await this.searchDuckDuckGoHTML(query, maxResults);
-        results.push(...htmlResults);
+      // Fallback for web/dev mode: use Vite proxy to Ollama Web Search
+      try { console.log('[WebSearch] path: vite-proxy (Ollama Web Search)'); } catch {}
+      const response = await fetch('/ollama-web-search', {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ query, max_results: Math.min(Math.max(1, Number(maxResults) || 5), 10) }),
+      });
+
+      const results: SearchResult[] = [];
+      if (response.ok) {
+        const data = await response.json();
+        if (Array.isArray(data.results)) {
+          for (const r of data.results.slice(0, maxResults)) {
+            if (r.url && r.title) {
+              // Use snippet field if available, otherwise use content
+              // Per Ollama docs, content field contains "relevant content snippet"
+              // Truncate aggressively to save context window tokens (400 chars ≈ 100 tokens)
+              let snippet = r.snippet || r.description || r.content || '';
+              
+              // Aggressive truncation for context efficiency (400 chars per result)
+              // 3 results × 100 tokens = ~300 tokens total (down from ~2,500)
+              const maxLength = 400;
+              if (snippet.length > maxLength) {
+                snippet = snippet.substring(0, maxLength).trim() + '...';
+              }
+              
+              // Final fallback to title
+              if (!snippet) {
+                snippet = r.title;
+              }
+              
+              results.push({
+                url: r.url,
+                title: r.title,
+                snippet: snippet,
+              });
+            }
+          }
+        }
+        try { console.log('[WebSearch] vite-proxy returned', results.length); } catch {}
+      } else {
+        console.warn('Ollama web search proxy response not OK:', response.status);
       }
 
-      return {
-        query,
-        results: results.slice(0, maxResults),
-        timestamp: Date.now(),
-      };
+      return { query, results, timestamp: Date.now() };
     } catch (error) {
       console.error('Search error:', error);
       // Return empty results rather than throwing
@@ -84,53 +100,7 @@ export class SearchService {
    * Fallback: Parse DuckDuckGo HTML search results
    * This is used when the instant answer API doesn't return results
    */
-  private static async searchDuckDuckGoHTML(
-    query: string,
-    maxResults: number
-  ): Promise<SearchResult[]> {
-    try {
-      const encodedQuery = encodeURIComponent(query);
-      const response = await fetch(
-        `https://html.duckduckgo.com/html/?q=${encodedQuery}`,
-        {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          },
-        }
-      );
-
-      if (!response.ok) {
-        return [];
-      }
-
-      const html = await response.text();
-      const results: SearchResult[] = [];
-
-      // Parse HTML using regex (simple parsing for basic results)
-      // Look for result links and snippets
-      const resultPattern = /<a[^>]+class="result__a"[^>]+href="([^"]+)"[^>]*>([^<]+)<\/a>[\s\S]*?<a[^>]+class="result__snippet"[^>]*>([^<]+)<\/a>/g;
-      
-      let match;
-      while ((match = resultPattern.exec(html)) !== null && results.length < maxResults) {
-        const url = this.decodeHTMLEntities(match[1]);
-        const title = this.decodeHTMLEntities(match[2]);
-        const snippet = this.decodeHTMLEntities(match[3]);
-
-        if (url && title) {
-          results.push({
-            url,
-            title,
-            snippet: snippet || title,
-          });
-        }
-      }
-
-      return results;
-    } catch (error) {
-      console.error('HTML search error:', error);
-      return [];
-    }
-  }
+  // Removed old DuckDuckGo HTML fallback for dev (replaced by SearXNG proxy)
 
   /**
    * Format search results into a context string for the LLM
@@ -173,14 +143,7 @@ export class SearchService {
     return display;
   }
 
-  /**
-   * Helper to decode HTML entities
-   */
-  private static decodeHTMLEntities(text: string): string {
-    const textArea = document.createElement('textarea');
-    textArea.innerHTML = text;
-    return textArea.value;
-  }
+  // Removed HTML entity decode helper (no longer parsing HTML)
 
   /**
    * Detect if a query would benefit from web search
@@ -189,11 +152,21 @@ export class SearchService {
   static shouldUseWebSearch(query: string): boolean {
     const lowerQuery = query.toLowerCase();
     
-    // Keywords that suggest current/recent information
+    // Keywords that suggest current/recent information or web lookup
     const currentKeywords = [
+      // Time-sensitive
       'latest', 'recent', 'new', 'current', 'today', 'now', 'this year',
-      '2024', '2025', 'update', 'news', 'breaking', 'just', 'happening',
-      'price', 'stock', 'weather', 'score', 'what is', 'who is',
+      '2024', '2025', '2026', 'update', 'news', 'breaking', 'just', 'happening',
+      // Explicit search intent
+      'search', 'find', 'lookup', 'look up', 'google', 'search for', 'find me',
+      // Price/commerce/data
+      'price', 'stock', 'weather', 'score', 'what is', 'who is', 'who are',
+      // Location-based queries
+      'near', 'near me', 'nearby', 'local', 'in the', 'area', 'where can i',
+      'where is', 'how do i get', 'directions', 'located',
+      // Business/service lookups
+      'phone number', 'address', 'hours', 'open', 'reviews', 'rating',
+      'best', 'top', 'recommended',
     ];
 
     return currentKeywords.some(keyword => lowerQuery.includes(keyword));

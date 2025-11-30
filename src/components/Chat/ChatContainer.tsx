@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
 import { useChatStore } from '../../stores/chatStore';
+import { supportsTools } from '../../constants/models';
 
 export const ChatContainer: React.FC = () => {
   const { 
@@ -15,6 +16,7 @@ export const ChatContainer: React.FC = () => {
     stopStreaming,
     isSearching,
     settings,
+    selectedModel, // Phase 2B: Need selectedModel for header display
   } = useChatStore();
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -88,12 +90,39 @@ export const ChatContainer: React.FC = () => {
 
   return (
     <div className="flex-1 flex flex-col h-full">
-      {/* Chat header with actions */}
+      {/* Chat header with actions - Phase 2B: Enhanced with mode indicator */}
       {currentConversation && currentConversation.messages.length > 0 && (
-        <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-2 flex items-center justify-between">
-          <div className="text-sm text-gray-600 dark:text-gray-300">
-            {currentConversation.messages.length} message{currentConversation.messages.length !== 1 ? 's' : ''}
-          </div>
+        <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3">
+          <div className="flex items-center justify-between max-w-full">
+            {/* Left: Model info + capabilities */}
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <div className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                {selectedModel}
+              </div>
+              
+              {/* Capability badges */}
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {supportsTools(selectedModel) && (
+                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 text-xs font-medium">
+                    <span>🛠️</span>
+                    <span>Tools</span>
+                  </span>
+                )}
+                
+                {settings.webSearchEnabled && (
+                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 text-xs font-medium">
+                    <span>🌐</span>
+                    <span>Web Search</span>
+                  </span>
+                )}
+              </div>
+              
+              <div className="text-xs text-gray-500 dark:text-gray-400">
+                {currentConversation.messages.length} message{currentConversation.messages.length !== 1 ? 's' : ''}
+              </div>
+            </div>
+            
+            {/* Right: Actions */}
           <div className="flex items-center gap-2">
             {/* Export Buttons */}
             <button
@@ -143,6 +172,7 @@ export const ChatContainer: React.FC = () => {
               </svg>
               Clear
             </button>
+          </div>
           </div>
         </div>
       )}
