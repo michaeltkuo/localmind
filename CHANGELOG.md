@@ -45,6 +45,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.1.0] - 2025-11-30
+
+### 🔍 Internet Search Integration
+
+#### Added
+- **Web Search Capability**: DuckDuckGo integration for real-time information retrieval
+- **Query Classification**: AI-powered intent detection to determine when web search is needed
+- **Citation System**: Visual citation pills showing sources for web-based answers
+- **Tool Architecture**: Modular tool framework for extensible functionality
+  - `BaseTool` abstract class for consistent tool implementation
+  - `ToolRegistry` for managing and executing tools
+  - `WebSearchTool` with DuckDuckGo integration
+- **Debug Service**: Comprehensive logging and monitoring system (315 lines)
+  - Search result tracking
+  - Performance monitoring
+  - Detailed request/response logging
+- **Enhanced Settings Panel**: 
+  - Model configuration UI
+  - Search preferences and controls
+  - Web search toggle
+- **Test Suite**: 252 lines of comprehensive tests for query classification
+- **Constants Management**: Centralized model definitions and system prompts
+
+#### Enhanced
+- **Chat Message Component**: Redesigned with citation rendering and source attribution
+- **Ollama Service**: Extended with better model management and streaming (+ 237 lines)
+- **Chat Store**: Enhanced state management for citations and tool results (+ 368 lines)
+- **Vite Configuration**: Improved build configuration for external dependencies
+
+#### Technical Improvements
+- Modular service architecture for maintainability
+- Type-safe tool execution pipeline
+- Error recovery and graceful degradation
+- Memory-efficient search result handling
+
+#### Files Changed
+- 26 files changed, 2,994 insertions(+), 368 deletions(-)
+- New services: `query-classifier.service.ts`, `debug.service.ts`
+- New tools: `base.tool.ts`, `registry.ts`, `web-search.tool.ts`
+- New component: `CitationPill.tsx`
+- Enhanced: `ChatMessage.tsx`, `SettingsPanel.tsx`, `chatStore.ts`
+
+---
+
 ## [Unreleased]
 
 ### Added

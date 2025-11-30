@@ -1,6 +1,6 @@
 {
   "name": "localmind",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "LocalMind - Your private AI assistant. All conversations stay on your computer.",
   "main": "dist-electron/main.js",
   "type": "module",
@@ -12,7 +12,10 @@
     "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
     "preview": "vite preview",
     "test": "jest",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "version:patch": "npm version patch -m 'chore: bump version to %s'",
+    "version:minor": "npm version minor -m 'chore: bump version to %s'",
+    "version:major": "npm version major -m 'chore: bump version to %s'"
   },
   "keywords": [
     "electron",
