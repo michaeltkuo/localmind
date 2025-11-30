@@ -54,3 +54,48 @@ textarea {
   -ms-overflow-style: none;  /* IE and Edge */
   scrollbar-width: none;  /* Firefox */
 }
+
+/* Phase 2B: Enhanced animations for search indicators */
+@keyframes spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes progress-bar {
+  0% {
+    transform: translateX(-100%);
+  }
+  50% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 2s linear infinite;
+}
+
+.animate-progress-bar {
+  animation: progress-bar 1.5s ease-in-out infinite;
+}
+
+/* Status icon animations */
+.status-icon {
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+.status-icon.entering {
+  transform: scale(0.8);
+  opacity: 0;
+}
+
+.status-icon.entered {
+  transform: scale(1);
+  opacity: 1;
+}

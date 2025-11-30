@@ -14,7 +14,8 @@ function App() {
     deleteConversation,
     currentConversation,
     conversations,
-    selectedModel, 
+    selectedModel,
+    setSelectedModel,
     availableModels,
     settings,
     updateSettings,
@@ -179,7 +180,10 @@ function App() {
         {showSettings && (
           <SettingsPanel
             settings={settings}
+            availableModels={availableModels}
+            selectedModel={selectedModel}
             onUpdateSettings={updateSettings}
+            onSelectModel={setSelectedModel}
             onClose={() => setShowSettings(false)}
           />
         )}

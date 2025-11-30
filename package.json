@@ -1,6 +1,6 @@
 {
   "name": "localmind",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "LocalMind - Your private AI assistant. All conversations stay on your computer.",
   "main": "dist-electron/main.js",
   "type": "module",
@@ -11,7 +11,11 @@
     "build:mac": "tsc && vite build && electron-builder --mac",
     "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
     "preview": "vite preview",
-    "type-check": "tsc --noEmit"
+    "test": "jest",
+    "type-check": "tsc --noEmit",
+    "version:patch": "npm version patch -m 'chore: bump version to %s'",
+    "version:minor": "npm version minor -m 'chore: bump version to %s'",
+    "version:major": "npm version major -m 'chore: bump version to %s'"
   },
   "keywords": [
     "electron",
@@ -36,12 +40,13 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-markdown": "^9.1.0",
-    "react-syntax-highlighter": "^15.6.6",
+    "react-syntax-highlighter": "^16.1.0",
     "remark-gfm": "^4.0.1",
     "zustand": "^4.4.7"
   },
   "devDependencies": {
     "@tailwindcss/typography": "^0.5.19",
+    "@types/jest": "^30.0.0",
     "@types/node": "^20.10.5",
     "@types/react": "^18.2.45",
     "@types/react-dom": "^18.2.18",
@@ -49,14 +54,18 @@
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.16",
     "concurrently": "^8.2.2",
-    "electron": "^28.0.0",
+    "electron": "^39.2.1",
     "electron-builder": "^24.13.3",
     "electron-icon-builder": "^2.0.1",
+    "identity-obj-proxy": "^3.0.0",
+    "jest": "^30.2.0",
+    "jest-environment-jsdom": "^30.2.0",
     "postcss": "^8.4.32",
     "sharp": "^0.34.5",
     "tailwindcss": "^3.3.6",
+    "ts-jest": "^29.4.5",
     "typescript": "^5.3.3",
-    "vite": "^5.0.8",
+    "vite": "^7.2.2",
     "vite-plugin-electron": "^0.28.1",
     "vite-plugin-electron-renderer": "^0.14.5",
     "wait-on": "^7.2.0"
