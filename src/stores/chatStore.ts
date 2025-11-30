@@ -69,7 +69,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   availableModels: [],
   selectedModel: 'llama3.2:latest',
   settings: DEFAULT_SETTINGS,
-  theme: (localStorage.getItem('theme') as 'light' | 'dark') || 'light',
+  theme: (typeof window !== 'undefined' && localStorage.getItem('theme') as 'light' | 'dark') || 'light',
   ollamaAvailable: false,
   modelLoaded: false,
   isLoadingModel: false,
@@ -379,13 +379,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         ];
 
         // Execute tool loop (non-streaming for now to handle tool calls properly)
-        // Pass maxSearchResults to tool if configured
-        const toolConfig = {
-          web_search: {
-            max_results: settings.maxSearchResults || 8
-          }
-        };
-        
         const result = await OllamaService.executeToolLoop(
           selectedModel,
           apiMessages,
