@@ -4,7 +4,7 @@
 
 A beautiful native desktop application for chatting with locally hosted LLM models using Ollama. Built with Electron, React, TypeScript, and Tailwind CSS.
 
-![Platform](https://img.shields.io/badge/Platform-macOS-lightgrey)
+![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Windows-lightgrey)
 ![License](https://img.shields.io/badge/License-MIT-green)
 ![Version](https://img.shields.io/badge/Version-1.1.0-blue)
 [![CI](https://github.com/michaeltkuo/localmind/actions/workflows/ci.yml/badge.svg)](https://github.com/michaeltkuo/localmind/actions/workflows/ci.yml)
@@ -112,11 +112,25 @@ curl http://localhost:11434/api/tags
 
 ### Install LocalMind
 
-Download the latest `.dmg` file from the [Releases](https://github.com/michaeltkuo/localmind/releases) page.
+Download the latest release for your platform from the [Releases](https://github.com/michaeltkuo/localmind/releases) page:
+- **macOS**: `.dmg` file
+- **Windows**: `.exe` installer
 
+#### macOS Installation
 1. Open the downloaded `.dmg` file
 2. Drag LocalMind to your Applications folder
 3. Launch LocalMind from Applications
+4. **First launch**: Right-click the app and select "Open" (required for unsigned apps)
+   - You'll see a security warning because the app isn't code-signed
+   - This is normal and safe - click "Open" to proceed
+   - This is only needed the first time you run the app
+
+#### Windows Installation
+1. Run the downloaded `.exe` installer
+2. Follow the installation wizard
+3. Launch LocalMind from the Start Menu or Desktop shortcut
+
+> **Note**: These builds are not code-signed. macOS users will see a security warning on first launch. This is because code signing requires an Apple Developer certificate ($99/year). The app is safe to use - just right-click and select "Open" to bypass Gatekeeper.
 
 ## 🎮 Usage
 

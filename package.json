@@ -9,6 +9,8 @@
     "build": "tsc && vite build && electron-builder",
     "build:dir": "tsc && vite build && electron-builder --dir",
     "build:mac": "tsc && vite build && electron-builder --mac",
+    "build:win": "tsc && vite build && electron-builder --win",
+    "build:all": "tsc && vite build && electron-builder --mac --win",
     "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
     "preview": "vite preview",
     "test": "jest",
@@ -88,9 +90,23 @@
     "mac": {
       "category": "public.app-category.productivity",
       "icon": "build/icon.png",
+      "target": ["dmg"],
+      "identity": null,
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false
+    },
+    "win": {
       "target": [
-        "dmg"
-      ]
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "build/icon.ico"
     },
     "dmg": {
       "contents": [
