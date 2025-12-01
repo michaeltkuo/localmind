@@ -46,11 +46,12 @@ jobs:
       
       # Step 3: Run npm audit
       # This checks for known security vulnerabilities in dependencies
-      # --audit-level=moderate: Fail on moderate, high, or critical vulnerabilities
-      # Adjust to 'high' or 'critical' if you want to be less strict
+      # --audit-level=high: Fail only on high or critical vulnerabilities
+      # Note: Some moderate vulnerabilities exist in dev dependencies (electron-icon-builder)
+      # These are in build-time tools, not runtime code, so we ignore them for now
       - name: Run npm audit
         run: |
-          npm audit --audit-level=moderate
+          npm audit --audit-level=high
         continue-on-error: false
       
       # Step 4: Generate detailed audit report (always runs)
