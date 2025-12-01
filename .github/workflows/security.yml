@@ -35,6 +35,15 @@ jobs:
           node-version: 20.x
           cache: 'npm'
       
+      # Step 2.5: Install dependencies
+      - name: Install dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+      
       # Step 3: Run npm audit
       # This checks for known security vulnerabilities in dependencies
       # --audit-level=moderate: Fail on moderate, high, or critical vulnerabilities
@@ -81,7 +90,12 @@ jobs:
           cache: 'npm'
       
       - name: Install dependencies
-        run: npm ci
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
       
       # This won't fail the workflow, just provides information
       - name: Check for outdated packages
