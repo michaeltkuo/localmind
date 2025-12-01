@@ -9,9 +9,98 @@ Thank you for your interest in contributing to LocalMind! 🎉
 3. Create a new branch: `git checkout -b feature/your-feature-name`
 4. Make your changes
 5. Test thoroughly
-6. Commit your changes: `git commit -m "Add your feature"`
+6. Commit your changes following our [commit conventions](#commit-message-conventions)
 7. Push to your fork: `git push origin feature/your-feature-name`
 8. Open a Pull Request
+
+## Commit Message Conventions
+
+We use [Conventional Commits](https://www.conventionalcommits.org/) for automated version management and changelog generation. This allows semantic-release to automatically determine version bumps and create releases.
+
+### Format
+
+```
+<type>[optional scope]: <description>
+
+[optional body]
+
+[optional footer(s)]
+```
+
+### Types and Version Impact
+
+| Type | Description | Version Bump | Example |
+|------|-------------|--------------|---------|
+| `feat` | New feature | **Minor** (1.1.0 → 1.2.0) | `feat: add web search integration` |
+| `fix` | Bug fix | **Patch** (1.1.0 → 1.1.1) | `fix: resolve chat input scrolling issue` |
+| `perf` | Performance improvement | **Patch** (1.1.0 → 1.1.1) | `perf: optimize message rendering` |
+| `refactor` | Code refactoring | **Patch** (1.1.0 → 1.1.1) | `refactor: simplify storage service` |
+| `docs` | Documentation only | **None** | `docs: update installation guide` |
+| `style` | Code style/formatting | **None** | `style: fix indentation` |
+| `test` | Adding tests | **None** | `test: add query classifier tests` |
+| `chore` | Maintenance tasks | **None** | `chore: update dependencies` |
+| `ci` | CI/CD changes | **None** | `ci: update workflow permissions` |
+| `build` | Build system changes | **None** | `build: configure electron-builder` |
+
+### Breaking Changes
+
+Breaking changes trigger a **major** version bump (1.1.0 → 2.0.0):
+
+```bash
+# Method 1: Use ! after type
+feat!: redesign settings panel API
+
+# Method 2: Add BREAKING CHANGE footer
+feat: update storage format
+
+BREAKING CHANGE: Old conversation files need migration
+```
+
+### Examples
+
+**✅ Good Commit Messages:**
+
+```bash
+feat: add conversation export functionality
+fix: prevent duplicate messages in chat
+docs: add troubleshooting section for Windows users
+refactor(search): improve query parsing logic
+feat(ui): add keyboard shortcuts for navigation
+```
+
+**❌ Bad Commit Messages:**
+
+```bash
+Update code          # Too vague, no type
+Fixed stuff          # No type, unclear
+WIP                  # Not descriptive
+feat Add feature     # Missing colon
+FEAT: new feature    # Type should be lowercase
+```
+
+### Scopes (Optional)
+
+Scopes provide additional context:
+
+- `ui` - User interface changes
+- `search` - Search functionality
+- `storage` - Data persistence
+- `ollama` - Ollama integration
+- `electron` - Electron-specific code
+- `deps` - Dependency updates
+
+```bash
+feat(ui): add dark mode toggle
+fix(ollama): handle connection timeout
+chore(deps): update React to 18.3.0
+```
+
+### Why This Matters
+
+- **Automated Releases**: Commits determine version numbers automatically
+- **Changelog Generation**: Release notes are generated from commit messages
+- **Clear History**: Makes it easy to understand what changed and why
+- **Semantic Versioning**: Follows semver principles (MAJOR.MINOR.PATCH)
 
 ## Development Setup
 
@@ -83,12 +172,15 @@ Before submitting a PR:
 ## Pull Request Guidelines
 
 ### PR Title Format
-- `feat: Add new feature`
-- `fix: Fix bug description`
-- `docs: Update documentation`
-- `style: UI improvements`
-- `refactor: Code refactoring`
-- `test: Add tests`
+
+PR titles should follow the same [commit conventions](#commit-message-conventions):
+
+- `feat: add conversation search`
+- `fix: resolve memory leak in chat`
+- `docs: update README installation steps`
+- `refactor: simplify message handling`
+- `perf: optimize rendering performance`
+- `test: add integration tests`
 
 ### PR Description Should Include
 - What changes were made
