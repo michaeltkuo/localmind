@@ -113,8 +113,10 @@ curl http://localhost:11434/api/tags
 ### Install LocalMind
 
 Download the latest release for your platform from the [Releases](https://github.com/michaeltkuo/localmind/releases) page:
-- **macOS**: `.dmg` file
-- **Windows**: `.exe` installer
+- **macOS**: `.dmg` file (built automatically via GitHub Actions)
+- **Windows**: `.exe` installer (built automatically via GitHub Actions)
+
+> **Automated Releases**: New versions are automatically built and released when code is merged to the main branch using semantic versioning.
 
 #### macOS Installation
 1. Open the downloaded `.dmg` file
@@ -202,13 +204,15 @@ local-chatbot/
 
 ### Tech Stack
 
-- **Electron 28** - Desktop app framework
+- **Electron 39** - Desktop app framework
 - **React 18** - UI framework
 - **TypeScript 5** - Type safety
-- **Vite 5** - Build tool
+- **Vite 7** - Build tool
 - **Tailwind CSS 3** - Styling
 - **Zustand** - State management
 - **Ollama** - LLM runtime
+- **Jest 30** - Testing framework
+- **semantic-release** - Automated versioning and releases
 
 ### Build for Production
 
@@ -216,11 +220,36 @@ local-chatbot/
 # Build for macOS
 npm run build:mac
 
+# Build for Windows
+npm run build:win
+
+# Build for both platforms
+npm run build:all
+
 # Build directory only (for testing)
 npm run build:dir
 
 # Output will be in release/ directory
 ```
+
+### CI/CD
+
+This project uses GitHub Actions for automated testing, security scanning, and releases:
+
+- **CI Workflow** - Runs tests and type-checking on every push/PR
+- **Security Workflow** - Scans for vulnerabilities weekly and on security updates
+- **Release Workflow** - Automatically builds and releases new versions on merge to main
+  - Uses semantic-release for automated versioning based on commit messages
+  - Builds macOS DMG files on macos-latest runners
+  - Creates GitHub releases with attached binaries
+  - Follow [Conventional Commits](https://www.conventionalcommits.org/) for automatic version bumps:
+    - `feat:` → minor version bump (1.1.0 → 1.2.0)
+    - `fix:` → patch version bump (1.1.0 → 1.1.1)
+    - `BREAKING CHANGE:` → major version bump (1.1.0 → 2.0.0)
+
+**Requirements for Release Workflow:**
+- Node.js 22+ (required by semantic-release v25)
+- macOS runner for building DMG files
 
 ## 🤝 Available Models
 
@@ -305,7 +334,7 @@ MIT License - See [LICENSE](LICENSE) for details
 Having issues? Check:
 1. Ollama is running: `curl http://localhost:11434/api/tags`
 2. Model is downloaded: `ollama list`
-3. Node.js version: `node --version` (should be 18+)
+3. Node.js version: `node --version` (should be 22+ for development)
 
 For more help, open an issue on [GitHub Issues](https://github.com/michaeltkuo/localmind/issues).
 
