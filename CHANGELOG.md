@@ -1,3 +1,25 @@
+## [1.2.0](https://github.com/michaeltkuo/localmind/compare/v1.1.0...v1.2.0) (2025-12-01)
+
+### ✨ Features
+
+* add automated semantic versioning (Phase 2) ([2d43ea4](https://github.com/michaeltkuo/localmind/commit/2d43ea411b6c397f90918b477b7e362576014dae))
+* add cross-platform build support for Windows ([4d2a86c](https://github.com/michaeltkuo/localmind/commit/4d2a86cbde8556e117bd77acc583715920f3fdd3))
+* add GitHub Actions CI/CD workflows (Phase 1) ([60afce4](https://github.com/michaeltkuo/localmind/commit/60afce445e464f8bc86a8a50772c7c2499dfb229))
+
+### 🐛 Bug Fixes
+
+* add GH_TOKEN to build step for electron-builder ([2a5590f](https://github.com/michaeltkuo/localmind/commit/2a5590ff8bd3d1fd3a485f4101b41526f8f78a23))
+* add package-lock.json and update workflows to handle missing lock file ([64a18d9](https://github.com/michaeltkuo/localmind/commit/64a18d983ccaf56cae8d2daf11eab533a296fa44))
+* enable persist-credentials for GITHUB_TOKEN ([86092bb](https://github.com/michaeltkuo/localmind/commit/86092bbfde94425332ab17e9fc5e77a766408dac))
+* resolve GitHub Actions release workflow failures ([81c7aa5](https://github.com/michaeltkuo/localmind/commit/81c7aa539a7060fc02b13ab271f8b02053537cf4))
+* resolve security vulnerabilities in dependencies ([34ee85b](https://github.com/michaeltkuo/localmind/commit/34ee85b95034828be625cd11dfb69d1f6c6f9799))
+* update Node.js version to 22 for semantic-release ([d5aed07](https://github.com/michaeltkuo/localmind/commit/d5aed07317e352c3f8b9ad810fe10e93f0b8c2a7))
+* update semantic-release to resolve security vulnerabilities ([6032671](https://github.com/michaeltkuo/localmind/commit/6032671799496eea7b7d19788f8ae37af077f766))
+
+### 📝 Documentation
+
+* clean up README and update to v1.1.0 with web search feature ([aea2c62](https://github.com/michaeltkuo/localmind/commit/aea2c62195ef778e2b2b991af0ba4e9314cc9e7d))
+
 # Changelog
 
 All notable changes to LocalMind will be documented in this file.

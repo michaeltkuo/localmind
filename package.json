@@ -1,6 +1,6 @@
 {
   "name": "localmind",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "LocalMind - Your private AI assistant. All conversations stay on your computer.",
   "main": "dist-electron/main.js",
   "type": "module",
@@ -90,7 +90,9 @@
     "mac": {
       "category": "public.app-category.productivity",
       "icon": "build/icon.png",
-      "target": ["dmg"],
+      "target": [
+        "dmg"
+      ],
       "identity": null,
       "hardenedRuntime": false,
       "gatekeeperAssess": false
@@ -99,11 +101,15 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         },
         {
           "target": "portable",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "icon": "build/icon.ico"
