@@ -1,0 +1,97 @@
+name: CI
+
+# Trigger this workflow on:
+# - Every push to any branch
+# - Every pull request targeting any branch
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: ['**']
+
+# Cancel in-progress runs when a new run is triggered
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Main CI job that runs tests, type checking, and validation
+  test-and-validate:
+    name: Test & Validate
+    runs-on: ubuntu-latest
+    
+    # Define environment
+    strategy:
+      matrix:
+        node-version: [20.x]
+    
+    steps:
+      # Step 1: Check out the repository code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      # Step 2: Set up Node.js environment
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+      
+      # Step 3: Install dependencies
+      # Using 'npm ci' instead of 'npm install' for faster, reproducible builds
+      - name: Install dependencies
+        run: npm ci
+      
+      # Step 4: Run TypeScript type checking
+      # This ensures all TypeScript types are correct
+      - name: Type check
+        run: npm run type-check
+      
+      # Step 5: Run Jest tests
+      # Includes unit tests for services and components
+      - name: Run tests
+        run: npm test
+        env:
+          CI: true
+      
+      # Step 6: Build the application
+      # Validates that the app builds successfully without publishing
+      # Using build:dir to skip electron-builder packaging (faster)
+      - name: Build validation
+        run: |
+          npm run build:dir
+        env:
+          NODE_ENV: production
+      
+      # Step 7: Upload build artifacts (optional, for debugging)
+      # Only runs if you want to inspect the build output
+      - name: Upload build artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-output
+          path: |
+            dist/
+            dist-electron/
+          retention-days: 7
+
+  # Lint job (optional - uncomment when ESLint is configured)
+  # lint:
+  #   name: Lint Code
+  #   runs-on: ubuntu-latest
+  #   
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v4
+  #     
+  #     - name: Setup Node.js
+  #       uses: actions/setup-node@v4
+  #       with:
+  #         node-version: 20.x
+  #         cache: 'npm'
+  #     
+  #     - name: Install dependencies
+  #       run: npm ci
+  #     
+  #     - name: Run ESLint
+  #       run: npm run lint

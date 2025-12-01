@@ -7,6 +7,8 @@ A beautiful native desktop application for chatting with locally hosted LLM mode
 ![Platform](https://img.shields.io/badge/Platform-macOS-lightgrey)
 ![License](https://img.shields.io/badge/License-MIT-green)
 ![Version](https://img.shields.io/badge/Version-1.1.0-blue)
+[![CI](https://github.com/michaeltkuo/localmind/actions/workflows/ci.yml/badge.svg)](https://github.com/michaeltkuo/localmind/actions/workflows/ci.yml)
+[![Security Scan](https://github.com/michaeltkuo/localmind/actions/workflows/security.yml/badge.svg)](https://github.com/michaeltkuo/localmind/actions/workflows/security.yml)
 
 ## ✨ Features
 
