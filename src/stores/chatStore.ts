@@ -367,8 +367,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
     try {
       if (useToolCalling) {
-        // NEW: Use tool-calling architecture
-        console.log('[ChatStore] Using tool-calling mode');
+        // NEW: Use tool-calling architecture with streaming
+        console.log('[ChatStore] Using tool-calling mode with streaming');
         
         // Prepare messages with appropriate system prompt
         const systemPrompt = getSystemPrompt(true); // true = tools enabled
@@ -378,8 +378,11 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           userMessage,
         ];
 
-        // Execute tool loop (non-streaming for now to handle tool calls properly)
-        const result = await OllamaService.executeToolLoop(
+        const abortController = new AbortController();
+        set({ abortController });
+
+        // Execute tool loop with streaming for final response
+        await OllamaService.executeToolLoopStreaming(
           selectedModel,
           apiMessages,
           5, // max iterations
@@ -438,8 +441,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
                 const last = messages[messages.length - 1];
                 if (last && last.role === 'assistant') {
                   last.searchResults = toolResult.data.results;
-                  // Don't change status here - keep it as 'searching' until final response
-                  // Removing 'typing' status prevents content from disappearing
+                  // Keep status as 'searching' - it will transition to streaming soon
+                  // Don't change status here to avoid flashing
                   set({ currentConversation: { ...current, messages } });
                 }
               }
@@ -447,44 +450,68 @@ export const useChatStore = create<ChatStore>((set, get) => ({
               // Notify user of search failure
               set({ error: `Search failed: ${toolResult.error || 'Unknown error'}` });
             }
-          }
-        );
+          },
+          (chunk) => {
+            // Stream chunks to UI
+            const current = get().currentConversation;
+            if (!current) return;
 
-        // Update assistant message with final content
-        const current = get().currentConversation;
-        if (current) {
-          const messages = [...current.messages];
-          const last = messages[messages.length - 1];
-          if (last && last.role === 'assistant') {
-            last.content = result.content;
-            last.status = undefined;
-            
-            // Phase 3B: Log model response
-            if (settings.debugMode && logId) {
-              const responseDuration = Date.now() - startTime;
-              const tokenCount = estimateTokenCount(result.content);
-              debugService.logModelResponse(logId, result.content, responseDuration, tokenCount);
+            const messages = [...current.messages];
+            const lastMessage = messages[messages.length - 1];
+            if (lastMessage.role === 'assistant') {
+              lastMessage.content += chunk;
+              // Only clear status once we start receiving content
+              if (lastMessage.content.length > 0) {
+                lastMessage.status = undefined;
+              }
+              set({
+                currentConversation: {
+                  ...current,
+                  messages,
+                  updatedAt: Date.now(),
+                },
+              });
             }
+          },
+          () => {
+            // On complete
+            console.log('[ChatStore] Tool loop streaming complete');
             
-            // Keep search results attached (they may already be there from tool callback)
-            
-            const updatedConv = { ...current, messages, updatedAt: Date.now() };
-            set({ 
-              currentConversation: updatedConv,
-              isStreaming: false,
-            });
-            
-            StorageService.saveConversation(updatedConv);
-            
-            // Update conversations list
-            const conversations = get().conversations;
-            const index = conversations.findIndex(c => c.id === updatedConv.id);
-            if (index >= 0) {
-              conversations[index] = updatedConv;
-              set({ conversations: [...conversations] });
+            const current = get().currentConversation;
+            if (current) {
+              const messages = [...current.messages];
+              const last = messages[messages.length - 1];
+              if (last && last.role === 'assistant') {
+                last.status = undefined;
+                
+                // Phase 3B: Log model response
+                if (settings.debugMode && logId) {
+                  const responseDuration = Date.now() - startTime;
+                  const tokenCount = estimateTokenCount(last.content);
+                  debugService.logModelResponse(logId, last.content, responseDuration, tokenCount);
+                }
+                
+                const updatedConv = { ...current, messages, updatedAt: Date.now() };
+                set({ 
+                  currentConversation: updatedConv,
+                  isStreaming: false,
+                  abortController: null,
+                });
+                
+                StorageService.saveConversation(updatedConv);
+                
+                // Update conversations list
+                const conversations = get().conversations;
+                const index = conversations.findIndex(c => c.id === updatedConv.id);
+                if (index >= 0) {
+                  conversations[index] = updatedConv;
+                  set({ conversations: [...conversations] });
+                }
+              }
             }
-          }
-        }
+          },
+          abortController.signal
+        );
       } else {
         // FALLBACK: Use legacy streaming mode (no tools)
         console.log('[ChatStore] Using legacy streaming mode (no tools)');
