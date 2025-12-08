@@ -1,3 +1,19 @@
+## [Unreleased]
+
+### 🐛 Bug Fixes
+
+* **web-search**: implement streaming responses for web search tool calls
+  - Previously, responses appeared instantly after search completed (non-streaming)
+  - Now uses new `executeToolLoopStreaming` method for word-by-word streaming
+  - Improved UX with smooth status transitions (searching → streaming)
+  - Prevents UI flashing between search completion and response generation
+
+### 🔧 Technical Improvements
+
+* Add `executeToolLoopStreaming` method to `OllamaService` for streaming final responses after tool execution
+* Update `chatStore` to use streaming tool loop with proper status management
+* Maintain "searching" status until content starts streaming to avoid blank UI states
+
 ## [1.2.0](https://github.com/michaeltkuo/localmind/compare/v1.1.0...v1.2.0) (2025-12-01)
 
 ### ✨ Features

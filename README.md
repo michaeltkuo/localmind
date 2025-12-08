@@ -47,6 +47,7 @@ LocalMind now supports internet search capability to supplement the AI's knowled
 - 🎯 **Auto-Detection** - Automatically detects when queries need current information
 - 📚 **Source Citations** - Search results are displayed with clickable links
 - ⚡ **Seamless Integration** - Search context is injected into conversations automatically
+- 🌊 **Streaming Responses** - AI responses stream word-by-word even when using web search
 - 🔒 **User Control** - Enable/disable via Settings panel
 
 **How to Use:**
@@ -61,6 +62,12 @@ LocalMind now supports internet search capability to supplement the AI's knowled
 - Recent tech: "What's new in TypeScript 5.4?"
 - Documentation: "How do I use React Server Components?"
 - Real-time data: "Current trends in web development"
+
+**Technical Details:**
+- Uses Ollama's tool-calling architecture for seamless integration
+- Search results are fetched first, then the AI generates a streaming response
+- Status indicators show when the AI is searching vs. generating response
+- Smooth transition from "searching" to streaming without UI flashing
 
 **Privacy Note:** Web searches are performed using DuckDuckGo's privacy-friendly API. No personal data is tracked.
 

@@ -245,7 +245,7 @@ export class OllamaService {
       iterations++;
       console.log(`[OllamaService] Tool loop iteration ${iterations}/${maxIterations}`);
 
-      // Call model with tools
+      // Call model with tools (non-streaming to detect tool calls)
       const response = await this.chatWithTools(model, conversationMessages, tools, signal);
 
       // Check if model wants to use tools
@@ -325,6 +325,139 @@ export class OllamaService {
       
       return {
         content: response.message.content,
+        iterations,
+        toolCalls: toolCallCount,
+      };
+    }
+
+    // Max iterations reached
+    console.warn('[OllamaService] Max tool iterations reached');
+    throw new Error('Maximum tool calling iterations reached. The model may be stuck in a loop.');
+  }
+
+  /**
+   * Execute tool-calling loop with streaming for final response
+   * This version streams the final answer after tools are executed
+   */
+  static async executeToolLoopStreaming(
+    model: string,
+    messages: Message[],
+    maxIterations: number = 5,
+    onToolCall?: (toolName: string, args: any) => void,
+    onToolResult?: (result: any) => void,
+    onChunk?: (chunk: string) => void,
+    onComplete?: () => void,
+    signal?: AbortSignal
+  ): Promise<{ iterations: number; toolCalls: number }> {
+    const tools = toolRegistry.getToolDefinitions();
+    let iterations = 0;
+    let toolCallCount = 0;
+    const conversationMessages = [...messages];
+
+    console.log('[OllamaService] Starting streaming tool execution loop', { 
+      model, 
+      toolsAvailable: tools.length,
+      maxIterations 
+    });
+
+    while (iterations < maxIterations) {
+      iterations++;
+      console.log(`[OllamaService] Tool loop iteration ${iterations}/${maxIterations}`);
+
+      // Call model with tools (non-streaming to detect tool calls)
+      const response = await this.chatWithTools(model, conversationMessages, tools, signal);
+
+      // Check if model wants to use tools
+      if (response.message.tool_calls && response.message.tool_calls.length > 0) {
+        console.log('[OllamaService] Model requested tool calls:', response.message.tool_calls);
+        
+        // Add assistant's tool call message to conversation
+        conversationMessages.push({
+          id: `tool-call-${Date.now()}`,
+          role: 'assistant',
+          content: '',
+          tool_calls: response.message.tool_calls,
+          timestamp: Date.now(),
+        });
+
+        // Execute each tool call
+        for (const toolCall of response.message.tool_calls) {
+          toolCallCount++;
+          const toolName = toolCall.function.name;
+          
+          // Parse arguments if they're a string
+          let args: any;
+          if (typeof toolCall.function.arguments === 'string') {
+            try {
+              args = JSON.parse(toolCall.function.arguments);
+            } catch (e) {
+              console.error('[OllamaService] Failed to parse tool arguments:', e);
+              args = {};
+            }
+          } else {
+            args = toolCall.function.arguments;
+          }
+
+          console.log(`[OllamaService] Executing tool: ${toolName}`, args);
+          onToolCall?.(toolName, args);
+
+          // Execute the tool
+          const result = await toolRegistry.execute(toolName, args);
+          console.log(`[OllamaService] Tool result:`, result);
+          onToolResult?.(result);
+
+          // Format result for model
+          let resultContent: string;
+          if (result.success && result.data) {
+            if (result.data.formatted) {
+              resultContent = result.data.formatted;
+            } else {
+              resultContent = JSON.stringify(result.data, null, 2);
+            }
+          } else {
+            resultContent = result.error || 'Tool execution failed';
+          }
+
+          // Add tool result to conversation
+          conversationMessages.push({
+            id: `tool-result-${Date.now()}-${toolCallCount}`,
+            role: 'tool',
+            content: resultContent,
+            tool_call_id: toolCall.id,
+            tool_name: toolName,
+            timestamp: Date.now(),
+          });
+        }
+
+        // Continue loop to get model's response with tool results
+        continue;
+      }
+
+      // No tool calls - stream the final response
+      console.log('[OllamaService] No more tool calls, streaming final response');
+      
+      // Now stream the response without tools to get the final answer
+      await this.chat(
+        model,
+        conversationMessages,
+        signal || new AbortController().signal,
+        (chunk) => {
+          onChunk?.(chunk);
+        },
+        () => {
+          console.log('[OllamaService] Streaming tool loop complete', { 
+            iterations, 
+            toolCallCount
+          });
+          onComplete?.();
+        },
+        (error) => {
+          console.error('[OllamaService] Streaming error:', error);
+          throw new Error(error);
+        }
+      );
+      
+      return {
         iterations,
         toolCalls: toolCallCount,
       };
