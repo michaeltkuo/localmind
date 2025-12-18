@@ -436,6 +436,9 @@ export class OllamaService {
       // No tool calls - stream the final response
       console.log('[OllamaService] No more tool calls, streaming final response');
       
+      // Capture any streaming errors to propagate after await
+      let streamError: string | null = null;
+      
       // Now stream the response without tools to get the final answer
       await this.chat(
         model,
@@ -453,9 +456,14 @@ export class OllamaService {
         },
         (error) => {
           console.error('[OllamaService] Streaming error:', error);
-          throw new Error(error);
+          streamError = error;
         }
       );
+      
+      // Propagate error if one occurred during streaming
+      if (streamError) {
+        throw new Error(streamError);
+      }
       
       return {
         iterations,
