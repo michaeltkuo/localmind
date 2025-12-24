@@ -443,7 +443,7 @@ export class OllamaService {
       await this.chat(
         model,
         conversationMessages,
-        signal || new AbortController().signal,
+        signal,
         (chunk) => {
           onChunk?.(chunk);
         },
