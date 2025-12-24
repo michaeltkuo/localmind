@@ -338,6 +338,27 @@ export class OllamaService {
   /**
    * Execute tool-calling loop with streaming for final response
    * This version streams the final answer after tools are executed
+   * 
+   * @param model - The model to use for generation
+   * @param messages - The conversation history
+   * @param maxIterations - Maximum number of tool-calling iterations (default: 5)
+   * @param onToolCall - Callback invoked when a tool is called
+   * @param onToolResult - Callback invoked when a tool returns a result
+   * @param onChunk - Callback invoked for each chunk of the streamed response
+   * @param onComplete - Callback invoked when streaming is complete
+   * @param signal - AbortSignal for cancellation
+   * 
+   * @returns Promise resolving to { iterations, toolCalls }
+   * 
+   * @throws Error if maximum iterations are reached without completion
+   * 
+   * @remarks
+   * **Important behavior notes:**
+   * - The return value does NOT include the final response content (unlike the non-streaming version)
+   * - Callers MUST use the `onChunk` callback to capture the streamed content
+   * - Content is streamed in real-time via `onChunk` and is not buffered for the return value
+   * - If max iterations are reached, throws an error rather than returning a partial result
+   * - Use this method when you need real-time streaming of the final response
    */
   static async executeToolLoopStreaming(
     model: string,
