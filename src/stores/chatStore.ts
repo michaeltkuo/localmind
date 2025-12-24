@@ -441,8 +441,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
                 const last = messages[messages.length - 1];
                 if (last && last.role === 'assistant') {
                   last.searchResults = toolResult.data.results;
-                  // Keep status as 'searching' - it will transition to streaming soon
-                  // Don't change status here to avoid flashing
+                  // Keep status as 'searching' - it will transition to streaming soon.
+                  // The status is cleared in the onChunk callback (see line 465) once content starts arriving.
+                  // Don't change status here to avoid flashing.
                   set({ currentConversation: { ...current, messages } });
                 }
               }
