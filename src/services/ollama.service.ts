@@ -219,6 +219,82 @@ export class OllamaService {
   }
 
   /**
+   * Process tool calls by executing each tool and adding results to conversation
+   * @private
+   */
+  private static async processToolCalls(
+    toolCalls: ToolCall[],
+    conversationMessages: Message[],
+    toolCallCount: number,
+    onToolCall?: (toolName: string, args: any) => void,
+    onToolResult?: (result: any) => void
+  ): Promise<number> {
+    console.log('[OllamaService] Model requested tool calls:', toolCalls);
+    
+    // Add assistant's tool call message to conversation
+    // Note: Don't include content here - it may contain thinking/reasoning that shouldn't be shown
+    conversationMessages.push({
+      id: `tool-call-${Date.now()}`,
+      role: 'assistant',
+      content: '', // Keep empty to avoid showing intermediate reasoning
+      tool_calls: toolCalls,
+      timestamp: Date.now(),
+    });
+
+    // Execute each tool call
+    for (const toolCall of toolCalls) {
+      toolCallCount++;
+      const toolName = toolCall.function.name;
+      
+      // Parse arguments if they're a string
+      let args: any;
+      if (typeof toolCall.function.arguments === 'string') {
+        try {
+          args = JSON.parse(toolCall.function.arguments);
+        } catch (e) {
+          console.error('[OllamaService] Failed to parse tool arguments:', e);
+          args = {};
+        }
+      } else {
+        args = toolCall.function.arguments;
+      }
+
+      console.log(`[OllamaService] Executing tool: ${toolName}`, args);
+      onToolCall?.(toolName, args);
+
+      // Execute the tool
+      const result = await toolRegistry.execute(toolName, args);
+      console.log(`[OllamaService] Tool result:`, result);
+      onToolResult?.(result);
+
+      // Format result for model
+      let resultContent: string;
+      if (result.success && result.data) {
+        // If it's a web search, use the formatted results
+        if (result.data.formatted) {
+          resultContent = result.data.formatted;
+        } else {
+          resultContent = JSON.stringify(result.data, null, 2);
+        }
+      } else {
+        resultContent = result.error || 'Tool execution failed';
+      }
+
+      // Add tool result to conversation
+      conversationMessages.push({
+        id: `tool-result-${Date.now()}-${toolCallCount}`,
+        role: 'tool',
+        content: resultContent,
+        tool_call_id: toolCall.id,
+        tool_name: toolName,
+        timestamp: Date.now(),
+      });
+    }
+
+    return toolCallCount;
+  }
+
+  /**
    * Execute a complete tool-calling loop
    * Handles iterative tool calls until model produces final response
    */
@@ -250,67 +326,14 @@ export class OllamaService {
 
       // Check if model wants to use tools
       if (response.message.tool_calls && response.message.tool_calls.length > 0) {
-        console.log('[OllamaService] Model requested tool calls:', response.message.tool_calls);
-        
-        // Add assistant's tool call message to conversation
-        // Note: Don't include content here - it may contain thinking/reasoning that shouldn't be shown
-        conversationMessages.push({
-          id: `tool-call-${Date.now()}`,
-          role: 'assistant',
-          content: '', // Keep empty to avoid showing intermediate reasoning
-          tool_calls: response.message.tool_calls,
-          timestamp: Date.now(),
-        });
-
-        // Execute each tool call
-        for (const toolCall of response.message.tool_calls) {
-          toolCallCount++;
-          const toolName = toolCall.function.name;
-          
-          // Parse arguments if they're a string
-          let args: any;
-          if (typeof toolCall.function.arguments === 'string') {
-            try {
-              args = JSON.parse(toolCall.function.arguments);
-            } catch (e) {
-              console.error('[OllamaService] Failed to parse tool arguments:', e);
-              args = {};
-            }
-          } else {
-            args = toolCall.function.arguments;
-          }
-
-          console.log(`[OllamaService] Executing tool: ${toolName}`, args);
-          onToolCall?.(toolName, args);
-
-          // Execute the tool
-          const result = await toolRegistry.execute(toolName, args);
-          console.log(`[OllamaService] Tool result:`, result);
-          onToolResult?.(result);
-
-          // Format result for model
-          let resultContent: string;
-          if (result.success && result.data) {
-            // If it's a web search, use the formatted results
-            if (result.data.formatted) {
-              resultContent = result.data.formatted;
-            } else {
-              resultContent = JSON.stringify(result.data, null, 2);
-            }
-          } else {
-            resultContent = result.error || 'Tool execution failed';
-          }
-
-          // Add tool result to conversation
-          conversationMessages.push({
-            id: `tool-result-${Date.now()}-${toolCallCount}`,
-            role: 'tool',
-            content: resultContent,
-            tool_call_id: toolCall.id,
-            tool_name: toolName,
-            timestamp: Date.now(),
-          });
-        }
+        // Process all tool calls using the shared helper
+        toolCallCount = await this.processToolCalls(
+          response.message.tool_calls,
+          conversationMessages,
+          toolCallCount,
+          onToolCall,
+          onToolResult
+        );
 
         // Continue loop to get model's response with tool results
         continue;
@@ -369,65 +392,14 @@ export class OllamaService {
 
       // Check if model wants to use tools
       if (response.message.tool_calls && response.message.tool_calls.length > 0) {
-        console.log('[OllamaService] Model requested tool calls:', response.message.tool_calls);
-        
-        // Add assistant's tool call message to conversation
-        conversationMessages.push({
-          id: `tool-call-${Date.now()}`,
-          role: 'assistant',
-          content: '',
-          tool_calls: response.message.tool_calls,
-          timestamp: Date.now(),
-        });
-
-        // Execute each tool call
-        for (const toolCall of response.message.tool_calls) {
-          toolCallCount++;
-          const toolName = toolCall.function.name;
-          
-          // Parse arguments if they're a string
-          let args: any;
-          if (typeof toolCall.function.arguments === 'string') {
-            try {
-              args = JSON.parse(toolCall.function.arguments);
-            } catch (e) {
-              console.error('[OllamaService] Failed to parse tool arguments:', e);
-              args = {};
-            }
-          } else {
-            args = toolCall.function.arguments;
-          }
-
-          console.log(`[OllamaService] Executing tool: ${toolName}`, args);
-          onToolCall?.(toolName, args);
-
-          // Execute the tool
-          const result = await toolRegistry.execute(toolName, args);
-          console.log(`[OllamaService] Tool result:`, result);
-          onToolResult?.(result);
-
-          // Format result for model
-          let resultContent: string;
-          if (result.success && result.data) {
-            if (result.data.formatted) {
-              resultContent = result.data.formatted;
-            } else {
-              resultContent = JSON.stringify(result.data, null, 2);
-            }
-          } else {
-            resultContent = result.error || 'Tool execution failed';
-          }
-
-          // Add tool result to conversation
-          conversationMessages.push({
-            id: `tool-result-${Date.now()}-${toolCallCount}`,
-            role: 'tool',
-            content: resultContent,
-            tool_call_id: toolCall.id,
-            tool_name: toolName,
-            timestamp: Date.now(),
-          });
-        }
+        // Process all tool calls using the shared helper
+        toolCallCount = await this.processToolCalls(
+          response.message.tool_calls,
+          conversationMessages,
+          toolCallCount,
+          onToolCall,
+          onToolResult
+        );
 
         // Continue loop to get model's response with tool results
         continue;
