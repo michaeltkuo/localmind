@@ -501,6 +501,27 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         ];
 
         let streamStarted = false;
+        // rAF batching: buffer incoming tokens and flush to state at ~60fps
+        // instead of calling set() on every single token (which would cause
+        // a full React re-render for each one).
+        let pendingContent = '';
+        let rafId: number | null = null;
+
+        const flushPending = () => {
+          rafId = null;
+          if (!pendingContent) return;
+          const toFlush = pendingContent;
+          pendingContent = '';
+          const current = get().currentConversation;
+          if (!current) return;
+          const messages = [...current.messages];
+          const lastMessage = messages[messages.length - 1];
+          if (lastMessage?.role === 'assistant') {
+            lastMessage.content += toFlush;
+            set({ currentConversation: { ...current, messages, updatedAt: Date.now() } });
+          }
+        };
+
         const thinkingTimer = window.setTimeout(() => {
           const current = get().currentConversation;
           if (!current) return;
@@ -517,29 +538,33 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           apiMessages,
           abortController.signal,
           (chunk) => {
-            // Update assistant message with streamed content
-            const current = get().currentConversation;
-            if (!current) return;
-
-            const messages = [...current.messages];
-            const lastMessage = messages[messages.length - 1];
-            if (lastMessage.role === 'assistant') {
-              if (!streamStarted) {
-                streamStarted = true;
-                window.clearTimeout(thinkingTimer);
-                lastMessage.status = undefined;
+            if (!streamStarted) {
+              streamStarted = true;
+              window.clearTimeout(thinkingTimer);
+              // Clear thinking status immediately on first chunk (don't wait for rAF)
+              const current = get().currentConversation;
+              if (current) {
+                const messages = [...current.messages];
+                const last = messages[messages.length - 1];
+                if (last?.role === 'assistant') {
+                  last.status = undefined;
+                  set({ currentConversation: { ...current, messages } });
+                }
               }
-              lastMessage.content += chunk;
-              set({
-                currentConversation: {
-                  ...current,
-                  messages,
-                  updatedAt: Date.now(),
-                },
-              });
+            }
+            // Buffer the chunk — the rAF will flush it to state
+            pendingContent += chunk;
+            if (rafId === null) {
+              rafId = requestAnimationFrame(flushPending);
             }
           },
           () => {
+            // Flush any tokens that arrived since the last rAF tick
+            if (rafId !== null) {
+              cancelAnimationFrame(rafId);
+              rafId = null;
+            }
+            flushPending();
             // On complete
             set({ isStreaming: false, abortController: null });
             const final = get().currentConversation;

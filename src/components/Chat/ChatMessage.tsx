@@ -8,9 +8,13 @@ import { CitationPill } from './CitationPill';
 
 interface ChatMessageProps {
   message: Message;
+  /** When true, the message is actively being streamed — skip expensive
+   * ReactMarkdown parsing and render plain text instead. Once streaming
+   * completes this flips to false and the full markdown render kicks in. */
+  isActivelyStreaming?: boolean;
 }
 
-export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
+export const ChatMessage: React.FC<ChatMessageProps> = ({ message, isActivelyStreaming = false }) => {
   const isUser = message.role === 'user';
   const [copied, setCopied] = useState(false);
   // Track which sources are actually cited inline to show a summary later
@@ -71,6 +75,25 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
           >
             {isUser ? (
               <p className="whitespace-pre-wrap break-words">{message.content}</p>
+            ) : isActivelyStreaming ? (
+              // During streaming: plain text only — no ReactMarkdown/Prism parsing.
+              // This avoids re-parsing the growing string on every rAF flush.
+              // Once streaming completes, React re-renders with full markdown below.
+              <>
+                {message.status === 'thinking' && (
+                  <div className="flex items-center gap-2 text-gray-400 dark:text-gray-500 text-sm">
+                    <span className="animate-pulse">Thinking…</span>
+                  </div>
+                )}
+                {message.status === 'searching' && (
+                  <div className="flex items-center gap-2 text-blue-500 text-sm">
+                    <span className="animate-pulse">Searching the web…</span>
+                  </div>
+                )}
+                {message.content && (
+                  <p className="whitespace-pre-wrap break-words">{message.content}</p>
+                )}
+              </>
             ) : (
               <>
                 {/* Status bubble states - Phase 2B: Enhanced animations */}
