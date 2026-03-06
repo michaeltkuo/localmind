@@ -8,9 +8,10 @@ import { CitationPill } from './CitationPill';
 
 interface ChatMessageProps {
   message: Message;
-  /** When true, the message is actively being streamed — skip expensive
-   * ReactMarkdown parsing and render plain text instead. Once streaming
-   * completes this flips to false and the full markdown render kicks in. */
+  /** When true, the message is actively being streamed. ReactMarkdown runs
+   * as normal so markdown renders correctly throughout, but the Prism syntax
+   * highlighter is swapped for a lightweight plain pre/code block to avoid
+   * re-tokenizing code on every rAF flush. Prism is restored on completion. */
   isActivelyStreaming?: boolean;
 }
 
@@ -75,25 +76,6 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, isActivelyStr
           >
             {isUser ? (
               <p className="whitespace-pre-wrap break-words">{message.content}</p>
-            ) : isActivelyStreaming ? (
-              // During streaming: plain text only — no ReactMarkdown/Prism parsing.
-              // This avoids re-parsing the growing string on every rAF flush.
-              // Once streaming completes, React re-renders with full markdown below.
-              <>
-                {message.status === 'thinking' && (
-                  <div className="flex items-center gap-2 text-gray-400 dark:text-gray-500 text-sm">
-                    <span className="animate-pulse">Thinking…</span>
-                  </div>
-                )}
-                {message.status === 'searching' && (
-                  <div className="flex items-center gap-2 text-blue-500 text-sm">
-                    <span className="animate-pulse">Searching the web…</span>
-                  </div>
-                )}
-                {message.content && (
-                  <p className="whitespace-pre-wrap break-words">{message.content}</p>
-                )}
-              </>
             ) : (
               <>
                 {/* Status bubble states - Phase 2B: Enhanced animations */}
@@ -187,7 +169,22 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, isActivelyStr
                       code({ className, children }) {
                         const match = /language-(\w+)/.exec(className || '');
                         const isCodeBlock = match && String(children).includes('\n');
-                        return isCodeBlock ? (
+                        if (!isCodeBlock) {
+                          return <code className={className}>{children}</code>;
+                        }
+                        // During streaming: skip Prism entirely — it re-tokenizes the full
+                        // block on every rAF flush which is the main render bottleneck.
+                        // Plain pre/code is visually consistent; Prism kicks in on completion.
+                        if (isActivelyStreaming) {
+                          return (
+                            <div className="rounded bg-gray-900 px-4 py-3 overflow-x-auto my-2">
+                              <pre className="text-gray-100 text-sm font-mono whitespace-pre">
+                                <code>{String(children).replace(/\n$/, '')}</code>
+                              </pre>
+                            </div>
+                          );
+                        }
+                        return (
                           <SyntaxHighlighter
                             style={vscDarkPlus as any}
                             language={match[1]}
@@ -195,10 +192,6 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, isActivelyStr
                           >
                             {String(children).replace(/\n$/, '')}
                           </SyntaxHighlighter>
-                        ) : (
-                          <code className={className}>
-                            {children}
-                          </code>
                         );
                       },
                       a({ href, children }) {
