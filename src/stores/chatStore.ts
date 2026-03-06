@@ -500,6 +500,40 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           userMessage,
         ];
 
+        // Capture the streaming conversation's ID so every callback targets it
+        // by identity, not by get().currentConversation. This means navigating
+        // to another chat mid-stream does not corrupt or drop tokens — the stream
+        // continues writing to conversations[] in the background.
+        const streamingConversationId = conversation.id;
+
+        // Helper: find a conversation in the store by ID and apply an updater.
+        // Also syncs currentConversation if the user is still viewing it.
+        const updateStreamingConversation = (updater: (conv: Conversation) => Conversation) => {
+          const state = get();
+          const conversations = [...state.conversations];
+          const index = conversations.findIndex(c => c.id === streamingConversationId);
+          // The conversation may not be in the list yet if the store just initialised;
+          // fall back to currentConversation for the first update.
+          const target = index >= 0 ? conversations[index]
+            : state.currentConversation?.id === streamingConversationId
+              ? state.currentConversation
+              : null;
+          if (!target) return;
+
+          const updated = updater(target);
+
+          const nextState: Partial<typeof state> = {};
+          if (index >= 0) {
+            conversations[index] = updated;
+            nextState.conversations = conversations;
+          }
+          // Only update currentConversation if the user is still on this chat
+          if (state.currentConversation?.id === streamingConversationId) {
+            nextState.currentConversation = updated;
+          }
+          set(nextState as any);
+        };
+
         let streamStarted = false;
         // rAF batching: buffer incoming tokens and flush to state at ~60fps
         // instead of calling set() on every single token (which would cause
@@ -512,25 +546,25 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           if (!pendingContent) return;
           const toFlush = pendingContent;
           pendingContent = '';
-          const current = get().currentConversation;
-          if (!current) return;
-          const messages = [...current.messages];
-          const lastMessage = messages[messages.length - 1];
-          if (lastMessage?.role === 'assistant') {
-            lastMessage.content += toFlush;
-            set({ currentConversation: { ...current, messages, updatedAt: Date.now() } });
-          }
+          updateStreamingConversation(conv => {
+            const messages = [...conv.messages];
+            const lastMessage = messages[messages.length - 1];
+            if (lastMessage?.role === 'assistant') {
+              lastMessage.content += toFlush;
+            }
+            return { ...conv, messages, updatedAt: Date.now() };
+          });
         };
 
         const thinkingTimer = window.setTimeout(() => {
-          const current = get().currentConversation;
-          if (!current) return;
-          const messages = [...current.messages];
-          const last = messages[messages.length - 1];
-          if (last && last.role === 'assistant' && !last.content) {
-            last.status = 'thinking';
-            set({ currentConversation: { ...current, messages } });
-          }
+          updateStreamingConversation(conv => {
+            const messages = [...conv.messages];
+            const last = messages[messages.length - 1];
+            if (last && last.role === 'assistant' && !last.content) {
+              last.status = 'thinking';
+            }
+            return { ...conv, messages };
+          });
         }, 250);
 
         await OllamaService.chat(
@@ -542,15 +576,12 @@ export const useChatStore = create<ChatStore>((set, get) => ({
               streamStarted = true;
               window.clearTimeout(thinkingTimer);
               // Clear thinking status immediately on first chunk (don't wait for rAF)
-              const current = get().currentConversation;
-              if (current) {
-                const messages = [...current.messages];
+              updateStreamingConversation(conv => {
+                const messages = [...conv.messages];
                 const last = messages[messages.length - 1];
-                if (last?.role === 'assistant') {
-                  last.status = undefined;
-                  set({ currentConversation: { ...current, messages } });
-                }
-              }
+                if (last?.role === 'assistant') last.status = undefined;
+                return { ...conv, messages };
+              });
             }
             // Buffer the chunk — the rAF will flush it to state
             pendingContent += chunk;
@@ -565,23 +596,27 @@ export const useChatStore = create<ChatStore>((set, get) => ({
               rafId = null;
             }
             flushPending();
-            // On complete
             set({ isStreaming: false, abortController: null });
-            const final = get().currentConversation;
-            if (final) {
-              const messages = [...final.messages];
+            // Find the final state of the streamed conversation (may differ from
+            // currentConversation if the user navigated away)
+            const state = get();
+            const finalConv = state.conversations.find(c => c.id === streamingConversationId)
+              ?? state.currentConversation;
+            if (finalConv) {
+              const messages = [...finalConv.messages];
               const last = messages[messages.length - 1];
-              if (last && last.role === 'assistant') {
-                last.status = undefined;
-              }
-              const updatedConv = { ...final, messages };
+              if (last && last.role === 'assistant') last.status = undefined;
+              const updatedConv = { ...finalConv, messages };
               StorageService.saveConversation(updatedConv);
-              
-              const conversations = get().conversations;
-              const index = conversations.findIndex(c => c.id === updatedConv.id);
+              const conversations = [...state.conversations];
+              const index = conversations.findIndex(c => c.id === streamingConversationId);
               if (index >= 0) {
                 conversations[index] = updatedConv;
-                set({ conversations: [...conversations] });
+                const nextState: any = { conversations };
+                if (state.currentConversation?.id === streamingConversationId) {
+                  nextState.currentConversation = updatedConv;
+                }
+                set(nextState);
               }
             }
           },
@@ -604,7 +639,14 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   },
 
   // Load a conversation
+  // Checks in-memory state first so that switching back to a conversation that
+  // is currently streaming shows live content rather than the stale disk version.
   loadConversation: (id: string) => {
+    const inMemory = get().conversations.find(c => c.id === id);
+    if (inMemory) {
+      set({ currentConversation: inMemory });
+      return;
+    }
     const conversation = StorageService.loadConversation(id);
     if (conversation) {
       set({ currentConversation: conversation });
