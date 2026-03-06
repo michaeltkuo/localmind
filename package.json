@@ -1,6 +1,6 @@
 {
   "name": "localmind",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "LocalMind - Your private AI assistant. All conversations stay on your computer.",
   "main": "dist-electron/main.js",
   "type": "module",

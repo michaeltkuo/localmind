@@ -1,3 +1,26 @@
+## [1.3.0](https://github.com/michaeltkuo/localmind/compare/v1.2.0...v1.3.0) (2026-03-06)
+
+### ✨ Features
+
+* generate conversation titles via LLM after first response ([08f428b](https://github.com/michaeltkuo/localmind/commit/08f428bfaee912649bb6e1c1ff6a7cf6a814d3b8))
+* inject current date into system prompt at call time ([00463de](https://github.com/michaeltkuo/localmind/commit/00463deb2f08fa27f303c02b65cd288b8719f550))
+* rewrite system prompts with XML structure, identity, and anti-sycophancy ([58ea90d](https://github.com/michaeltkuo/localmind/commit/58ea90d3f7de78dcd1c8906bf06fb7c66346e677))
+
+### 🐛 Bug Fixes
+
+* show LLM-generated title in sidebar instead of raw user message ([b388205](https://github.com/michaeltkuo/localmind/commit/b388205c456267ccee18fa4276f954b1a8a02085))
+* streaming tokens no longer lost when navigating between conversations ([5e77420](https://github.com/michaeltkuo/localmind/commit/5e77420b6d653d92a412b9ac9c8647805aedb9c8))
+* upsert conversation into list before streaming so token writes never drop ([3778ad2](https://github.com/michaeltkuo/localmind/commit/3778ad225223d5fe6d7470edb9064afa28b5f524))
+
+### ⚡ Performance Improvements
+
+* batch streaming tokens with rAF, skip ReactMarkdown during streaming ([453f163](https://github.com/michaeltkuo/localmind/commit/453f163d5465d1dd1a015d7712f8ff049bdd4617))
+* defer only Prism during streaming, keep ReactMarkdown always active ([6d612a5](https://github.com/michaeltkuo/localmind/commit/6d612a508ca9f0ffb2b305d0e2f5d12889b53b6e))
+
+### 📝 Documentation
+
+* update README with GitHub Actions CI/CD information ([ec52bff](https://github.com/michaeltkuo/localmind/commit/ec52bff39275efeccfd31f105aca186643300477))
+
 ## [1.2.0](https://github.com/michaeltkuo/localmind/compare/v1.1.0...v1.2.0) (2025-12-01)
 
 ### ✨ Features
