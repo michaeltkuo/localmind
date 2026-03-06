@@ -325,6 +325,10 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       title: conversation.messages.length === 0 ? content.slice(0, 50) : conversation.title,
     };
 
+    // Whether this is the first user message — used after streaming to trigger
+    // background LLM title generation.
+    const isFirstMessage = conversation.messages.length === 0;
+
     // Upsert the conversation into conversations[] immediately so that
     // updateStreamingConversation() can always find it by ID during streaming,
     // even if the user navigates to a different chat before the stream completes.
@@ -374,6 +378,30 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         }
       }
     }
+
+    // Fires after the first response completes: asks the model for a short title
+    // and updates the conversation in state + storage. Runs entirely in the
+    // background — never awaited, never blocks the chat stream.
+    const generateTitleInBackground = (assistantContent: string) => {
+      if (!isFirstMessage) return;
+      const convId = updatedConversation.id;
+      OllamaService.generateTitle(selectedModel, content, assistantContent)
+        .then(title => {
+          const state = get();
+          const convs = [...state.conversations];
+          const idx = convs.findIndex(c => c.id === convId);
+          if (idx < 0) return;
+          const updated = { ...convs[idx], title };
+          convs[idx] = updated;
+          const nextState: any = { conversations: convs };
+          if (state.currentConversation?.id === convId) {
+            nextState.currentConversation = updated;
+          }
+          set(nextState);
+          StorageService.saveConversation(updated);
+        })
+        .catch(() => { /* silently ignore — title stays as the truncated prompt */ });
+    };
 
     try {
       if (useToolCalling) {
@@ -485,7 +513,10 @@ export const useChatStore = create<ChatStore>((set, get) => ({
             });
             
             StorageService.saveConversation(updatedConv);
-            
+
+            // Background title generation for first message
+            generateTitleInBackground(result.content);
+
             // Update conversations list
             const conversations = get().conversations;
             const index = conversations.findIndex(c => c.id === updatedConv.id);
@@ -606,6 +637,10 @@ export const useChatStore = create<ChatStore>((set, get) => ({
               if (last && last.role === 'assistant') last.status = undefined;
               const updatedConv = { ...finalConv, messages };
               StorageService.saveConversation(updatedConv);
+
+              // Background title generation for first message
+              generateTitleInBackground(updatedConv.messages.find(m => m.role === 'assistant')?.content ?? '');
+
               const conversations = [...state.conversations];
               const index = conversations.findIndex(c => c.id === streamingConversationId);
               if (index >= 0) {
