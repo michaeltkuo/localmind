@@ -400,7 +400,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           set(nextState);
           StorageService.saveConversation(updated);
         })
-        .catch(() => { /* silently ignore — title stays as the truncated prompt */ });
+        .catch(() => { /* title generation is best-effort */ });
     };
 
     try {
