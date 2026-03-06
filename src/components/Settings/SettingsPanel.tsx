@@ -43,7 +43,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
       temperature: 0.7,
       maxTokens: 2048,
       topP: 0.9,
-      systemPrompt: 'You are a helpful AI assistant.',
+      systemPrompt: '', // Empty string uses the built-in LocalMind prompt
       webSearchEnabled: false,
       autoDetectSearchQueries: true,
       searchMode: 'off',
@@ -141,10 +141,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 onChange={(e) => setLocalSettings({ ...localSettings, systemPrompt: e.target.value })}
                 rows={4}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                placeholder="You are a helpful AI assistant."
+                placeholder="Leave empty to use the built-in LocalMind system prompt."
               />
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                Sets the behavior and personality of the AI assistant. This is sent with every conversation.
+                Override the default system prompt. Leave blank to use the built-in LocalMind prompt (recommended). Only applies in the standard non-tool mode.
               </p>
             </div>
 

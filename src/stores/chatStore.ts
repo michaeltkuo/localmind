@@ -52,7 +52,7 @@ const DEFAULT_SETTINGS: ChatSettings = {
   temperature: 0.7,
   maxTokens: 2048,
   topP: 0.9,
-  systemPrompt: 'You are a helpful AI assistant.',
+  systemPrompt: '', // Empty string defers to getSystemPrompt() — the canonical prompts in src/constants/prompts.ts
   webSearchEnabled: false,
   autoDetectSearchQueries: true,
   searchMode: 'off',
