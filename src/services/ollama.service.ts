@@ -372,6 +372,47 @@ export class OllamaService {
   }
 
   /**
+   * Generate a short conversation title from the first user message and the
+   * model's response. Fires a tiny non-streaming request so it never blocks
+   * the main chat stream. Returns a fallback string on any error.
+   */
+  static async generateTitle(
+    model: string,
+    userMessage: string,
+    assistantMessage: string
+  ): Promise<string> {
+    try {
+      const prompt = [
+        'Generate a short title for this conversation (5 words maximum).',
+        'Rules: no quotes, no punctuation at the end, title case, be specific not generic.',
+        'Reply with ONLY the title — nothing else.',
+        '',
+        `User: ${userMessage.slice(0, 300)}`,
+        `Assistant: ${assistantMessage.slice(0, 300)}`,
+      ].join('\n');
+
+      const response = await fetch(`${OLLAMA_BASE_URL}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model,
+          messages: [{ role: 'user', content: prompt }],
+          stream: false,
+          options: { temperature: 0.3, num_predict: 20 },
+        }),
+      });
+
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      const raw: string = data?.message?.content ?? '';
+      // Strip surrounding quotes the model sometimes adds, trim whitespace
+      return raw.replace(/^["'`]+|["'`]+$/g, '').trim() || 'New Conversation';
+    } catch {
+      return 'New Conversation';
+    }
+  }
+
+  /**
    * Pull (download) a model
    */
   static async pullModel(

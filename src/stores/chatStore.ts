@@ -52,7 +52,7 @@ const DEFAULT_SETTINGS: ChatSettings = {
   temperature: 0.7,
   maxTokens: 2048,
   topP: 0.9,
-  systemPrompt: 'You are a helpful AI assistant.',
+  systemPrompt: '', // Empty string defers to getSystemPrompt() — the canonical prompts in src/constants/prompts.ts
   webSearchEnabled: false,
   autoDetectSearchQueries: true,
   searchMode: 'off',
@@ -325,8 +325,22 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       title: conversation.messages.length === 0 ? content.slice(0, 50) : conversation.title,
     };
 
+    // Whether this is the first user message — used after streaming to trigger
+    // background LLM title generation.
+    const isFirstMessage = conversation.messages.length === 0;
+
+    // Upsert the conversation into conversations[] immediately so that
+    // updateStreamingConversation() can always find it by ID during streaming,
+    // even if the user navigates to a different chat before the stream completes.
+    const existingConversations = get().conversations;
+    const existingIndex = existingConversations.findIndex(c => c.id === updatedConversation.id);
+    const updatedConversationList = existingIndex >= 0
+      ? existingConversations.map((c, i) => i === existingIndex ? updatedConversation : c)
+      : [updatedConversation, ...existingConversations];
+
     set({ 
       currentConversation: updatedConversation,
+      conversations: updatedConversationList,
       isStreaming: true,
       error: null,
     });
@@ -364,6 +378,30 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         }
       }
     }
+
+    // Fires after the first response completes: asks the model for a short title
+    // and updates the conversation in state + storage. Runs entirely in the
+    // background — never awaited, never blocks the chat stream.
+    const generateTitleInBackground = (assistantContent: string) => {
+      if (!isFirstMessage) return;
+      const convId = updatedConversation.id;
+      OllamaService.generateTitle(selectedModel, content, assistantContent)
+        .then(title => {
+          const state = get();
+          const convs = [...state.conversations];
+          const idx = convs.findIndex(c => c.id === convId);
+          if (idx < 0) return;
+          const updated = { ...convs[idx], title };
+          convs[idx] = updated;
+          const nextState: any = { conversations: convs };
+          if (state.currentConversation?.id === convId) {
+            nextState.currentConversation = updated;
+          }
+          set(nextState);
+          StorageService.saveConversation(updated);
+        })
+        .catch(() => { /* title generation is best-effort */ });
+    };
 
     try {
       if (useToolCalling) {
@@ -475,7 +513,10 @@ export const useChatStore = create<ChatStore>((set, get) => ({
             });
             
             StorageService.saveConversation(updatedConv);
-            
+
+            // Background title generation for first message
+            generateTitleInBackground(result.content);
+
             // Update conversations list
             const conversations = get().conversations;
             const index = conversations.findIndex(c => c.id === updatedConv.id);
@@ -500,16 +541,60 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           userMessage,
         ];
 
-        let streamStarted = false;
-        const thinkingTimer = window.setTimeout(() => {
-          const current = get().currentConversation;
-          if (!current) return;
-          const messages = [...current.messages];
-          const last = messages[messages.length - 1];
-          if (last && last.role === 'assistant' && !last.content) {
-            last.status = 'thinking';
-            set({ currentConversation: { ...current, messages } });
+        // Capture the streaming conversation's ID so every callback targets it
+        // by identity, not by get().currentConversation. This means navigating
+        // to another chat mid-stream does not corrupt or drop tokens — the stream
+        // continues writing to conversations[] in the background.
+        const streamingConversationId = conversation.id;
+
+        // Helper: find a conversation in the store by ID and apply an updater.
+        // Also syncs currentConversation if the user is still viewing it.
+        const updateStreamingConversation = (updater: (conv: Conversation) => Conversation) => {
+          const state = get();
+          const conversations = [...state.conversations];
+          const index = conversations.findIndex(c => c.id === streamingConversationId);
+          if (index < 0) return; // should never happen after the upsert above
+          const updated = updater(conversations[index]);
+          conversations[index] = updated;
+          const nextState: any = { conversations };
+          // Only update currentConversation if the user is still on this chat
+          if (state.currentConversation?.id === streamingConversationId) {
+            nextState.currentConversation = updated;
           }
+          set(nextState);
+        };
+
+        let streamStarted = false;
+        // rAF batching: buffer incoming tokens and flush to state at ~60fps
+        // instead of calling set() on every single token (which would cause
+        // a full React re-render for each one).
+        let pendingContent = '';
+        let rafId: number | null = null;
+
+        const flushPending = () => {
+          rafId = null;
+          if (!pendingContent) return;
+          const toFlush = pendingContent;
+          pendingContent = '';
+          updateStreamingConversation(conv => {
+            const messages = [...conv.messages];
+            const lastMessage = messages[messages.length - 1];
+            if (lastMessage?.role === 'assistant') {
+              lastMessage.content += toFlush;
+            }
+            return { ...conv, messages, updatedAt: Date.now() };
+          });
+        };
+
+        const thinkingTimer = window.setTimeout(() => {
+          updateStreamingConversation(conv => {
+            const messages = [...conv.messages];
+            const last = messages[messages.length - 1];
+            if (last && last.role === 'assistant' && !last.content) {
+              last.status = 'thinking';
+            }
+            return { ...conv, messages };
+          });
         }, 250);
 
         await OllamaService.chat(
@@ -517,46 +602,54 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           apiMessages,
           abortController.signal,
           (chunk) => {
-            // Update assistant message with streamed content
-            const current = get().currentConversation;
-            if (!current) return;
-
-            const messages = [...current.messages];
-            const lastMessage = messages[messages.length - 1];
-            if (lastMessage.role === 'assistant') {
-              if (!streamStarted) {
-                streamStarted = true;
-                window.clearTimeout(thinkingTimer);
-                lastMessage.status = undefined;
-              }
-              lastMessage.content += chunk;
-              set({
-                currentConversation: {
-                  ...current,
-                  messages,
-                  updatedAt: Date.now(),
-                },
+            if (!streamStarted) {
+              streamStarted = true;
+              window.clearTimeout(thinkingTimer);
+              // Clear thinking status immediately on first chunk (don't wait for rAF)
+              updateStreamingConversation(conv => {
+                const messages = [...conv.messages];
+                const last = messages[messages.length - 1];
+                if (last?.role === 'assistant') last.status = undefined;
+                return { ...conv, messages };
               });
+            }
+            // Buffer the chunk — the rAF will flush it to state
+            pendingContent += chunk;
+            if (rafId === null) {
+              rafId = requestAnimationFrame(flushPending);
             }
           },
           () => {
-            // On complete
+            // Flush any tokens that arrived since the last rAF tick
+            if (rafId !== null) {
+              cancelAnimationFrame(rafId);
+              rafId = null;
+            }
+            flushPending();
             set({ isStreaming: false, abortController: null });
-            const final = get().currentConversation;
-            if (final) {
-              const messages = [...final.messages];
+            // Find the final state of the streamed conversation (may differ from
+            // currentConversation if the user navigated away)
+            const state = get();
+            const finalConv = state.conversations.find(c => c.id === streamingConversationId);
+            if (finalConv) {
+              const messages = [...finalConv.messages];
               const last = messages[messages.length - 1];
-              if (last && last.role === 'assistant') {
-                last.status = undefined;
-              }
-              const updatedConv = { ...final, messages };
+              if (last && last.role === 'assistant') last.status = undefined;
+              const updatedConv = { ...finalConv, messages };
               StorageService.saveConversation(updatedConv);
-              
-              const conversations = get().conversations;
-              const index = conversations.findIndex(c => c.id === updatedConv.id);
+
+              // Background title generation for first message
+              generateTitleInBackground(updatedConv.messages.find(m => m.role === 'assistant')?.content ?? '');
+
+              const conversations = [...state.conversations];
+              const index = conversations.findIndex(c => c.id === streamingConversationId);
               if (index >= 0) {
                 conversations[index] = updatedConv;
-                set({ conversations: [...conversations] });
+                const nextState: any = { conversations };
+                if (state.currentConversation?.id === streamingConversationId) {
+                  nextState.currentConversation = updatedConv;
+                }
+                set(nextState);
               }
             }
           },
@@ -579,7 +672,14 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   },
 
   // Load a conversation
+  // Checks in-memory state first so that switching back to a conversation that
+  // is currently streaming shows live content rather than the stale disk version.
   loadConversation: (id: string) => {
+    const inMemory = get().conversations.find(c => c.id === id);
+    if (inMemory) {
+      set({ currentConversation: inMemory });
+      return;
+    }
     const conversation = StorageService.loadConversation(id);
     if (conversation) {
       set({ currentConversation: conversation });

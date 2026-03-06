@@ -185,8 +185,14 @@ export const ChatContainer: React.FC = () => {
               <p>No messages yet. Start the conversation!</p>
             </div>
           ) : (
-            currentConversation.messages.map((message) => (
-              <ChatMessage key={message.id} message={message} />
+            currentConversation.messages.map((message, index) => (
+              <ChatMessage
+                key={message.id}
+                message={message}
+                isActivelyStreaming={
+                  isStreaming && index === currentConversation.messages.length - 1
+                }
+              />
             ))
           )}
           <div ref={messagesEndRef} />

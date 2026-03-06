@@ -31,16 +31,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
   };
 
   const getConversationPreview = (conversation: Conversation): string => {
-    if (conversation.messages.length === 0) {
-      return 'New conversation';
-    }
-    
-    const firstUserMessage = conversation.messages.find(m => m.role === 'user');
-    if (firstUserMessage) {
-      return firstUserMessage.content.slice(0, 50) + (firstUserMessage.content.length > 50 ? '...' : '');
-    }
-    
-    return conversation.title;
+    return conversation.title || 'New conversation';
   };
 
   // Sort conversations by updated date (newest first)

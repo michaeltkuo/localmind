@@ -8,9 +8,14 @@ import { CitationPill } from './CitationPill';
 
 interface ChatMessageProps {
   message: Message;
+  /** When true, the message is actively being streamed. ReactMarkdown runs
+   * as normal so markdown renders correctly throughout, but the Prism syntax
+   * highlighter is swapped for a lightweight plain pre/code block to avoid
+   * re-tokenizing code on every rAF flush. Prism is restored on completion. */
+  isActivelyStreaming?: boolean;
 }
 
-export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
+export const ChatMessage: React.FC<ChatMessageProps> = ({ message, isActivelyStreaming = false }) => {
   const isUser = message.role === 'user';
   const [copied, setCopied] = useState(false);
   // Track which sources are actually cited inline to show a summary later
@@ -164,7 +169,22 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
                       code({ className, children }) {
                         const match = /language-(\w+)/.exec(className || '');
                         const isCodeBlock = match && String(children).includes('\n');
-                        return isCodeBlock ? (
+                        if (!isCodeBlock) {
+                          return <code className={className}>{children}</code>;
+                        }
+                        // During streaming: skip Prism entirely — it re-tokenizes the full
+                        // block on every rAF flush which is the main render bottleneck.
+                        // Plain pre/code is visually consistent; Prism kicks in on completion.
+                        if (isActivelyStreaming) {
+                          return (
+                            <div className="rounded bg-gray-900 px-4 py-3 overflow-x-auto my-2">
+                              <pre className="text-gray-100 text-sm font-mono whitespace-pre">
+                                <code>{String(children).replace(/\n$/, '')}</code>
+                              </pre>
+                            </div>
+                          );
+                        }
+                        return (
                           <SyntaxHighlighter
                             style={vscDarkPlus as any}
                             language={match[1]}
@@ -172,10 +192,6 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
                           >
                             {String(children).replace(/\n$/, '')}
                           </SyntaxHighlighter>
-                        ) : (
-                          <code className={className}>
-                            {children}
-                          </code>
                         );
                       },
                       a({ href, children }) {

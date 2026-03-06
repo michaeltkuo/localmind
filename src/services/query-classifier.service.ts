@@ -47,7 +47,8 @@ export class QueryClassifier {
     
     // General current (this month/year)
     // Current state of things, present situation
-    if (/\b(current|now|nowadays|2025)\b/i.test(lower)) {
+    // Match any recent 4-digit year (2020s–2030s) rather than a hardcoded year
+    if (/\b(current|now|nowadays|20[2-3]\d)\b/i.test(lower)) {
       return QueryType.GENERAL_CURRENT;
     }
     
