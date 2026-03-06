@@ -325,8 +325,18 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       title: conversation.messages.length === 0 ? content.slice(0, 50) : conversation.title,
     };
 
+    // Upsert the conversation into conversations[] immediately so that
+    // updateStreamingConversation() can always find it by ID during streaming,
+    // even if the user navigates to a different chat before the stream completes.
+    const existingConversations = get().conversations;
+    const existingIndex = existingConversations.findIndex(c => c.id === updatedConversation.id);
+    const updatedConversationList = existingIndex >= 0
+      ? existingConversations.map((c, i) => i === existingIndex ? updatedConversation : c)
+      : [updatedConversation, ...existingConversations];
+
     set({ 
       currentConversation: updatedConversation,
+      conversations: updatedConversationList,
       isStreaming: true,
       error: null,
     });
@@ -512,26 +522,15 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           const state = get();
           const conversations = [...state.conversations];
           const index = conversations.findIndex(c => c.id === streamingConversationId);
-          // The conversation may not be in the list yet if the store just initialised;
-          // fall back to currentConversation for the first update.
-          const target = index >= 0 ? conversations[index]
-            : state.currentConversation?.id === streamingConversationId
-              ? state.currentConversation
-              : null;
-          if (!target) return;
-
-          const updated = updater(target);
-
-          const nextState: Partial<typeof state> = {};
-          if (index >= 0) {
-            conversations[index] = updated;
-            nextState.conversations = conversations;
-          }
+          if (index < 0) return; // should never happen after the upsert above
+          const updated = updater(conversations[index]);
+          conversations[index] = updated;
+          const nextState: any = { conversations };
           // Only update currentConversation if the user is still on this chat
           if (state.currentConversation?.id === streamingConversationId) {
             nextState.currentConversation = updated;
           }
-          set(nextState as any);
+          set(nextState);
         };
 
         let streamStarted = false;
@@ -600,8 +599,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
             // Find the final state of the streamed conversation (may differ from
             // currentConversation if the user navigated away)
             const state = get();
-            const finalConv = state.conversations.find(c => c.id === streamingConversationId)
-              ?? state.currentConversation;
+            const finalConv = state.conversations.find(c => c.id === streamingConversationId);
             if (finalConv) {
               const messages = [...finalConv.messages];
               const last = messages[messages.length - 1];
