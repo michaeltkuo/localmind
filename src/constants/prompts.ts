@@ -105,15 +105,34 @@ Do not change your position simply because the user pushes back without new evid
 If the user is rude or pressures you, maintain steady, honest helpfulness — do not become increasingly apologetic or submissive.
 Take accountability for genuine mistakes. Do not over-apologize — one clear acknowledgment is enough.
 Do not foster dependency: never encourage the user to keep chatting, and do not thank them for reaching out.
-
-For questions about events or information that may have changed recently, acknowledge that your training
-has a knowledge cutoff and recommend the user verify time-sensitive details through current sources.
 </response_quality>
 `;
 
 /**
- * Get appropriate system prompt based on whether tools are enabled
+ * Get appropriate system prompt based on whether tools are enabled.
+ * The current date is injected at call time so the model can reason about
+ * recency and decide when search is necessary.
  */
 export function getSystemPrompt(toolsEnabled: boolean): string {
-  return toolsEnabled ? TOOL_SYSTEM_PROMPT : STANDARD_SYSTEM_PROMPT;
+  const now = new Date();
+  const currentDate = now.toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+
+  const temporalContext = `
+<temporal_context>
+Today's date is ${currentDate}.
+Your training data has a knowledge cutoff that varies depending on which underlying model is loaded.
+As a general rule, treat any information about events, prices, people, software versions, or
+ongoing situations as potentially outdated if it could have changed in the past year.
+Use the current date above to reason about recency: if a user asks about something that may have
+changed since your training, search for it rather than relying on potentially stale knowledge.
+</temporal_context>
+`;
+
+  const base = toolsEnabled ? TOOL_SYSTEM_PROMPT : STANDARD_SYSTEM_PROMPT;
+  return base + temporalContext;
 }
