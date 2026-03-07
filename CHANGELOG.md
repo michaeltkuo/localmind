@@ -1,3 +1,9 @@
+## [1.4.0](https://github.com/michaeltkuo/localmind/compare/v1.3.0...v1.4.0) (2026-03-07)
+
+### ✨ Features
+
+* **ui:** compact layout — reduce rounding and reclaim chat real estate\n\n- Remove top header and move controls to compact sidebar\n- Tighten header, input, and sidebar spacing\n- Reduce rounded corners and shrink icon controls\n\nPreserves existing behavior and tests. ([9ac3caf](https://github.com/michaeltkuo/localmind/commit/9ac3caff753fac047b89bd8776712182a1296f4e))
+
 ## [1.3.0](https://github.com/michaeltkuo/localmind/compare/v1.2.0...v1.3.0) (2026-03-06)
 
 ### ✨ Features
