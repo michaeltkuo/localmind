@@ -66,6 +66,26 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, isActivelyStr
   return (
     <div className={`flex w-full ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
       <div className={`max-w-[80%] ${isUser ? 'order-2' : 'order-1'}`}>
+        {isUser && message.attachments && message.attachments.length > 0 && (
+          <div className="space-y-2 mb-2">
+            {message.attachments.map((attachment) => (
+              <div
+                key={attachment.documentId}
+                className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-4 py-3"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-red-500 flex items-center justify-center text-lg">📄</div>
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold truncate">{attachment.name}</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-300 uppercase">
+                      {(attachment.mimeType || 'file').split('/').pop() || 'File'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
         <div className="relative group">
           <div
             className={`rounded-lg px-4 py-3 ${

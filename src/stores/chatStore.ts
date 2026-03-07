@@ -1,8 +1,12 @@
 // Chat store using Zustand for state management
 import { create } from 'zustand';
-import type { Conversation, Message, ChatSettings, OllamaModel } from '../types';
+import type { Conversation, Message, ChatSettings, OllamaModel, UploadedDocument, DocumentChunk } from '../types';
 import { OllamaService } from '../services/ollama.service';
 import { StorageService } from '../services/storage.service';
+import { DocumentStorageService, DOCUMENT_TTL_MS } from '../services/document-storage.service';
+import { DocumentService } from '../services/document.service';
+import { RagService } from '../services/rag.service';
+import { VectorService } from '../services/vector.service';
 // SearchService kept for potential future use - currently using tool-based search
 // import { SearchService } from '../services/search.service';
 import { toolRegistry } from '../services/tools/registry';
@@ -11,6 +15,11 @@ import { supportsTools, getToolSupportMessage, estimateTokenCount, getContextLim
 import { getSystemPrompt } from '../constants/prompts';
 import { QueryClassifier } from '../services/query-classifier.service';
 import { debugService } from '../services/debug.service'; // Phase 3B: Debug logging
+
+const INTERNAL_EMBEDDING_MODEL = 'bge-m3';
+// Raise this so medium-sized PDFs (≤~20 pages / 8K tokens) bypass embedding entirely
+// and are stuffed directly into the LLM context. Zero embedding cost for those files.
+const INLINE_CONTEXT_MAX_TOKENS = 8000;
 
 interface ChatStore {
   // State
@@ -32,6 +41,13 @@ interface ChatStore {
   abortController: AbortController | null;
   isSearching: boolean;
   lastSearchQuery: string | null;
+  uploadedDocuments: UploadedDocument[];
+  documentChunks: DocumentChunk[];
+  isIndexingDocument: boolean;
+  indexingProgress: { current: number; total: number } | null;
+  indexingFileName: string | null;
+  indexingConversationId: string | null;
+  pendingAttachmentIdsByConversation: Record<string, string[]>;
 
   // Actions
   initializeApp: () => Promise<void>;
@@ -39,12 +55,14 @@ interface ChatStore {
   createNewConversation: () => void;
   sendMessage: (content: string, forceSearch?: boolean) => Promise<void>; // Phase 2B: forceSearch param
   stopStreaming: () => void;
-  loadConversation: (id: string) => void;
-  deleteConversation: (id: string) => void;
+  loadConversation: (id: string) => Promise<void>;
+  deleteConversation: (id: string) => Promise<void>;
   setSelectedModel: (model: string) => void;
   updateSettings: (settings: Partial<ChatSettings>) => void;
   toggleTheme: () => void;
   exportConversation: (id: string, format: 'json' | 'markdown') => void;
+  uploadDocument: (file: File) => Promise<void>;
+  removeDocument: (documentId: string) => Promise<void>;
   clearError: () => void;
 }
 
@@ -60,6 +78,12 @@ const DEFAULT_SETTINGS: ChatSettings = {
   debugMode: false,
   maxSearchResults: 8,
   searchTimeout: 10000,
+  ragEnabled: true,
+  embeddingModel: INTERNAL_EMBEDDING_MODEL,
+  ragTopK: 5,
+  ragChunkSize: 3000,  // bge-m3 has an 8192-token window; 3000 chars (~750 tokens) gives rich semantic units with headroom to spare
+  ragChunkOverlap: 200,
+  ragMaxContextTokens: 8000,
 };
 
 export const useChatStore = create<ChatStore>((set, get) => ({
@@ -82,6 +106,13 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   error: null,
   isSearching: false,
   lastSearchQuery: null,
+  uploadedDocuments: [],
+  documentChunks: [],
+  isIndexingDocument: false,
+  indexingProgress: null,
+  indexingFileName: null,
+  indexingConversationId: null,
+  pendingAttachmentIdsByConversation: {},
 
   // Get current model status
   getModelStatus: () => {
@@ -182,6 +213,10 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     set({ 
       currentConversation: newConversation,
       conversations: [newConversation, ...get().conversations],
+      uploadedDocuments: [],
+      documentChunks: [],
+      indexingProgress: null,
+      indexingConversationId: null,
     });
 
     StorageService.saveConversation(newConversation);
@@ -239,6 +274,16 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
     const conversation = get().currentConversation;
     if (!conversation) return;
+    const activeConversationId = conversation.id;
+
+    const expiredDocumentIds = await DocumentStorageService.pruneExpired(conversation.id);
+    if (expiredDocumentIds.length) {
+      const expiredSet = new Set(expiredDocumentIds);
+      set((state) => ({
+        uploadedDocuments: state.uploadedDocuments.filter((doc) => !expiredSet.has(doc.id)),
+        documentChunks: state.documentChunks.filter((chunk) => !expiredSet.has(chunk.documentId)),
+      }));
+    }
 
     // Check if model supports tools
     const modelSupportsTools = supportsTools(selectedModel);
@@ -305,6 +350,17 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       role: 'user',
       content,
       timestamp: Date.now(),
+      attachments: get()
+        .uploadedDocuments
+        .filter((doc) =>
+          (get().pendingAttachmentIdsByConversation[activeConversationId] || []).includes(doc.id)
+        )
+        .map((doc) => ({
+          documentId: doc.id,
+          name: doc.originalName || doc.name,
+          mimeType: doc.mimeType,
+          sizeBytes: doc.sizeBytes,
+        })),
     };
 
     // Create assistant placeholder
@@ -338,12 +394,42 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       ? existingConversations.map((c, i) => i === existingIndex ? updatedConversation : c)
       : [updatedConversation, ...existingConversations];
 
+    // If the pill is showing a ready file for this conversation, clear it now
+    // that it's been stamped into the message bubble.
+    const isThisConvPill = get().indexingConversationId === activeConversationId;
+
     set({ 
       currentConversation: updatedConversation,
       conversations: updatedConversationList,
       isStreaming: true,
       error: null,
+      pendingAttachmentIdsByConversation: {
+        ...get().pendingAttachmentIdsByConversation,
+        [activeConversationId]: [],
+      },
+      ...(isThisConvPill ? { indexingFileName: null, indexingConversationId: null } : {}),
     });
+
+    const updateConversationById = (
+      conversationId: string,
+      updater: (conv: Conversation) => Conversation
+    ) => {
+      const state = get();
+      const conversations = [...state.conversations];
+      const index = conversations.findIndex((c) => c.id === conversationId);
+      if (index < 0) {
+        return;
+      }
+
+      const updated = updater(conversations[index]);
+      conversations[index] = updated;
+
+      const nextState: any = { conversations };
+      if (state.currentConversation?.id === conversationId) {
+        nextState.currentConversation = updated;
+      }
+      set(nextState);
+    };
 
     // Save conversation
     StorageService.saveConversation(updatedConversation);
@@ -403,13 +489,29 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         .catch(() => { /* title generation is best-effort */ });
     };
 
+    let ragSystemPrefix = '';
+    if (settings.ragEnabled && get().uploadedDocuments.length > 0 && get().documentChunks.length > 0) {
+      try {
+        ragSystemPrefix = await RagService.buildSystemPrefixForQuery(content, {
+          enabled: settings.ragEnabled,
+          embeddingModel: INTERNAL_EMBEDDING_MODEL,
+          topK: settings.ragTopK || 5,
+          maxContextTokens: settings.ragMaxContextTokens || 4000,
+          documents: get().uploadedDocuments,
+          chunks: get().documentChunks,
+        });
+      } catch (ragError) {
+        console.warn('[ChatStore] RAG context retrieval failed, continuing without document context', ragError);
+      }
+    }
+
     try {
       if (useToolCalling) {
         // NEW: Use tool-calling architecture
         console.log('[ChatStore] Using tool-calling mode');
         
         // Prepare messages with appropriate system prompt
-        const systemPrompt = getSystemPrompt(true); // true = tools enabled
+        const systemPrompt = `${ragSystemPrefix}${getSystemPrompt(true)}`; // true = tools enabled
         const apiMessages: Message[] = [
           { id: 'system', role: 'system', content: systemPrompt, timestamp: Date.now() },
           ...conversation.messages,
@@ -434,19 +536,17 @@ export const useChatStore = create<ChatStore>((set, get) => ({
             }
             
             // Update status to show we're searching
-            const current = get().currentConversation;
-            if (current) {
-              const messages = [...current.messages];
+            updateConversationById(activeConversationId, (conv) => {
+              const messages = [...conv.messages];
               const last = messages[messages.length - 1];
               if (last && last.role === 'assistant') {
                 last.status = 'searching';
-                // Phase 2B: Track what's being searched
                 if (toolName === 'web_search' && args.query) {
                   last.lastSearchQuery = args.query;
                 }
-                set({ currentConversation: { ...current, messages } });
               }
-            }
+              return { ...conv, messages };
+            });
           },
           (toolResult) => {
             console.log('[ChatStore] Tool result:', toolResult);
@@ -470,17 +570,14 @@ export const useChatStore = create<ChatStore>((set, get) => ({
             
             // Attach search results to assistant message if available
             if (toolResult.success && toolResult.data?.results) {
-              const current = get().currentConversation;
-              if (current) {
-                const messages = [...current.messages];
+              updateConversationById(activeConversationId, (conv) => {
+                const messages = [...conv.messages];
                 const last = messages[messages.length - 1];
                 if (last && last.role === 'assistant') {
                   last.searchResults = toolResult.data.results;
-                  // Don't change status here - keep it as 'searching' until final response
-                  // Removing 'typing' status prevents content from disappearing
-                  set({ currentConversation: { ...current, messages } });
                 }
-              }
+                return { ...conv, messages };
+              });
             } else if (!toolResult.success) {
               // Notify user of search failure
               set({ error: `Search failed: ${toolResult.error || 'Unknown error'}` });
@@ -489,42 +586,29 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         );
 
         // Update assistant message with final content
-        const current = get().currentConversation;
-        if (current) {
-          const messages = [...current.messages];
+        let updatedConv: Conversation | null = null;
+        updateConversationById(activeConversationId, (conv) => {
+          const messages = [...conv.messages];
           const last = messages[messages.length - 1];
           if (last && last.role === 'assistant') {
             last.content = result.content;
             last.status = undefined;
-            
-            // Phase 3B: Log model response
-            if (settings.debugMode && logId) {
-              const responseDuration = Date.now() - startTime;
-              const tokenCount = estimateTokenCount(result.content);
-              debugService.logModelResponse(logId, result.content, responseDuration, tokenCount);
-            }
-            
-            // Keep search results attached (they may already be there from tool callback)
-            
-            const updatedConv = { ...current, messages, updatedAt: Date.now() };
-            set({ 
-              currentConversation: updatedConv,
-              isStreaming: false,
-            });
-            
-            StorageService.saveConversation(updatedConv);
-
-            // Background title generation for first message
-            generateTitleInBackground(result.content);
-
-            // Update conversations list
-            const conversations = get().conversations;
-            const index = conversations.findIndex(c => c.id === updatedConv.id);
-            if (index >= 0) {
-              conversations[index] = updatedConv;
-              set({ conversations: [...conversations] });
-            }
           }
+          updatedConv = { ...conv, messages, updatedAt: Date.now() };
+          return updatedConv;
+        });
+
+        set({ isStreaming: false, abortController: null });
+
+        if (updatedConv) {
+          if (settings.debugMode && logId) {
+            const responseDuration = Date.now() - startTime;
+            const tokenCount = estimateTokenCount(result.content);
+            debugService.logModelResponse(logId, result.content, responseDuration, tokenCount);
+          }
+
+          StorageService.saveConversation(updatedConv);
+          generateTitleInBackground(result.content);
         }
       } else {
         // FALLBACK: Use legacy streaming mode (no tools)
@@ -534,7 +618,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         set({ abortController });
 
         // Use standard system prompt
-        const systemPrompt = settings.systemPrompt || getSystemPrompt(false);
+        const basePrompt = settings.systemPrompt || getSystemPrompt(false);
+        const systemPrompt = `${ragSystemPrefix}${basePrompt}`;
         const apiMessages: Message[] = [
           { id: 'system', role: 'system', content: systemPrompt, timestamp: Date.now() },
           ...conversation.messages,
@@ -674,27 +759,46 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   // Load a conversation
   // Checks in-memory state first so that switching back to a conversation that
   // is currently streaming shows live content rather than the stale disk version.
-  loadConversation: (id: string) => {
+  loadConversation: async (id: string) => {
     const inMemory = get().conversations.find(c => c.id === id);
     if (inMemory) {
-      set({ currentConversation: inMemory });
+      const [uploadedDocuments, documentChunks] = await Promise.all([
+        DocumentStorageService.loadDocuments(id),
+        DocumentStorageService.loadChunks(id),
+      ]);
+      set({
+        currentConversation: inMemory,
+        uploadedDocuments,
+        documentChunks,
+      });
       return;
     }
     const conversation = StorageService.loadConversation(id);
     if (conversation) {
-      set({ currentConversation: conversation });
+      const [uploadedDocuments, documentChunks] = await Promise.all([
+        DocumentStorageService.loadDocuments(id),
+        DocumentStorageService.loadChunks(id),
+      ]);
+      set({
+        currentConversation: conversation,
+        uploadedDocuments,
+        documentChunks,
+      });
     }
   },
 
   // Delete a conversation
-  deleteConversation: (id: string) => {
+  deleteConversation: async (id: string) => {
     StorageService.deleteConversation(id);
+    await DocumentStorageService.clearConversation(id);
     const conversations = get().conversations.filter(c => c.id !== id);
-    set({ conversations });
+    const pending = { ...get().pendingAttachmentIdsByConversation };
+    delete pending[id];
+    set({ conversations, pendingAttachmentIdsByConversation: pending });
     
     // If deleted conversation was current, clear it
     if (get().currentConversation?.id === id) {
-      set({ currentConversation: null });
+      set({ currentConversation: null, uploadedDocuments: [], documentChunks: [] });
     }
   },
 
@@ -820,6 +924,159 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  },
+
+  uploadDocument: async (file: File) => {
+    const { settings } = get();
+
+    if (!file) {
+      return;
+    }
+
+    if (!get().currentConversation) {
+      get().createNewConversation();
+    }
+
+    const conversation = get().currentConversation;
+    if (!conversation) {
+      set({ error: 'Unable to create conversation for document upload.' });
+      return;
+    }
+
+    if (!DocumentService.isSupportedFile(file)) {
+      set({
+        error: `Unsupported file type. Supported: ${DocumentService.getSupportedExtensions().join(', ')}`,
+      });
+      return;
+    }
+
+    set({
+      isIndexingDocument: true,
+      indexingProgress: { current: 0, total: 1 },
+      indexingFileName: file.name,
+      indexingConversationId: conversation.id,
+      error: null,
+    });
+
+    const uploadConversationId = conversation.id;
+
+    try {
+      const text = await DocumentService.extractTextFromFile(file);
+      const estimatedTokens = VectorService.estimateTokenCount(text);
+      const ragBudget = settings.ragMaxContextTokens || 4000;
+      const shouldUseInlineContext = estimatedTokens <= Math.min(ragBudget, INLINE_CONTEXT_MAX_TOKENS);
+
+      if (!shouldUseInlineContext) {
+        await OllamaService.ensureModelAvailable(INTERNAL_EMBEDDING_MODEL, (progress) => {
+          if (progress < 100) {
+            set({ indexingProgress: { current: 0, total: 1 } });
+          }
+        });
+      }
+
+      const { document, chunks } = await DocumentService.indexTextDocument({
+        conversationId: conversation.id,
+        documentName: file.name,
+        mimeType: file.type || 'text/plain',
+        sizeBytes: file.size,
+        text,
+        embeddingModel: INTERNAL_EMBEDDING_MODEL,
+        chunkSize: settings.ragChunkSize,
+        overlap: settings.ragChunkOverlap,
+        skipEmbeddings: shouldUseInlineContext,
+        // Batch size 8 with bge-m3: each 3000-char chunk is ~750 tokens; 8 chunks
+        // per request is ~6000 tokens of payload — well within Ollama's limits.
+        // embedWithRetry will halve batches automatically on any 500/EOF.
+        embeddingBatchSize: 8,
+        onProgress: (current, total) => {
+          if (get().indexingConversationId === uploadConversationId) {
+            set({ indexingProgress: { current, total } });
+          }
+        },
+      });
+
+      await DocumentStorageService.saveDocument(document);
+      await DocumentStorageService.appendChunks(chunks);
+
+      set((state) => {
+        const nextPending = state.pendingAttachmentIdsByConversation[uploadConversationId] || [];
+        const shouldSyncCurrentConversation = state.currentConversation?.id === uploadConversationId;
+
+        return {
+          pendingAttachmentIdsByConversation: {
+            ...state.pendingAttachmentIdsByConversation,
+            [uploadConversationId]: [...nextPending, document.id],
+          },
+          ...(shouldSyncCurrentConversation
+            ? {
+                uploadedDocuments: [...state.uploadedDocuments, document],
+                documentChunks: [...state.documentChunks, ...chunks],
+              }
+            : {}),
+        };
+      });
+
+      if (typeof window !== 'undefined') {
+        const expiresIn = Math.max(0, document.uploadedAt + DOCUMENT_TTL_MS - Date.now());
+        window.setTimeout(async () => {
+          try {
+            const expiredIds = await DocumentStorageService.pruneExpired(conversation.id);
+            if (!expiredIds.length) {
+              return;
+            }
+
+            if (get().currentConversation?.id !== uploadConversationId) {
+              return;
+            }
+
+            const expiredSet = new Set(expiredIds);
+            set((state) => ({
+              uploadedDocuments: state.uploadedDocuments.filter((doc) => !expiredSet.has(doc.id)),
+              documentChunks: state.documentChunks.filter((chunk) => !expiredSet.has(chunk.documentId)),
+            }));
+          } catch (ttlError) {
+            console.warn('[ChatStore] TTL cleanup failed', ttlError);
+          }
+        }, expiresIn + 250);
+      }
+    } catch (error) {
+      console.error('[ChatStore] uploadDocument failed', error);
+      // On error, clear everything including the filename so the pill goes away.
+      set({
+        error: error instanceof Error ? error.message : 'Failed to upload document',
+        isIndexingDocument: false,
+        indexingProgress: null,
+        indexingFileName: null,
+        indexingConversationId: null,
+      });
+      return;
+    }
+    // Success path: clear the loading indicators but KEEP indexingFileName and
+    // indexingConversationId so the input pill can display the "ready" file card
+    // until the user sends their next message.
+    set({
+      isIndexingDocument: false,
+      indexingProgress: null,
+    });
+  },
+
+  removeDocument: async (documentId: string) => {
+    const { currentConversation } = get();
+    if (!currentConversation) {
+      return;
+    }
+
+    await DocumentStorageService.removeDocument(currentConversation.id, documentId);
+    set((state) => ({
+      uploadedDocuments: state.uploadedDocuments.filter((doc) => doc.id !== documentId),
+      documentChunks: state.documentChunks.filter((chunk) => chunk.documentId !== documentId),
+      pendingAttachmentIdsByConversation: {
+        ...state.pendingAttachmentIdsByConversation,
+        [currentConversation.id]: (state.pendingAttachmentIdsByConversation[currentConversation.id] || []).filter(
+          (id) => id !== documentId
+        ),
+      },
+    }));
   },
 
   // Clear error

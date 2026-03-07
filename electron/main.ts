@@ -1,9 +1,13 @@
 import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import path from 'path';
-import { fileURLToPath } from 'url';
+import { createRequire } from 'module';
+import { fileURLToPath, pathToFileURL } from 'url';
+import mammoth from 'mammoth';
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const require = createRequire(import.meta.url);
 
 let mainWindow: BrowserWindow | null = null;
 // Prefer environment variable; can be overridden via Settings at runtime
@@ -181,5 +185,65 @@ ipcMain.handle('search:web', async (_event, { query, maxResults = 5 }) => {
   } catch (error) {
     console.error('[Search] Error:', error);
     return { success: false, results: [], error: String(error) };
+  }
+});
+
+ipcMain.handle('documents:extractText', async (_event, { fileName, mimeType, bytes }) => {
+  try {
+    const lowerFileName = String(fileName || '').toLowerCase();
+    const buffer = Buffer.from(Array.isArray(bytes) ? bytes : []);
+
+    if (!buffer.length) {
+      throw new Error('No file data provided');
+    }
+
+    const isPdf = lowerFileName.endsWith('.pdf') || mimeType === 'application/pdf';
+    const isDocx =
+      lowerFileName.endsWith('.docx') ||
+      mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+    if (isPdf) {
+      const workerPath = require.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs');
+      pdfjsLib.GlobalWorkerOptions.workerSrc = pathToFileURL(workerPath).toString();
+
+      const loadingTask = pdfjsLib.getDocument({
+        data: new Uint8Array(buffer),
+      });
+      const pdfDocument = await loadingTask.promise;
+      const pageTexts: string[] = [];
+
+      for (let pageNumber = 1; pageNumber <= pdfDocument.numPages; pageNumber++) {
+        const page = await pdfDocument.getPage(pageNumber);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items
+          .map((item) => {
+            if ('str' in item) {
+              return item.str;
+            }
+            return '';
+          })
+          .join(' ')
+          .trim();
+
+        if (pageText) {
+          pageTexts.push(pageText);
+        }
+      }
+
+      return { success: true, text: pageTexts.join('\n\n').trim() };
+    }
+
+    if (isDocx) {
+      const parsed = await mammoth.extractRawText({ buffer });
+      return { success: true, text: (parsed.value || '').trim() };
+    }
+
+    throw new Error('Unsupported extraction type');
+  } catch (error) {
+    console.error('[Documents] extractText failed', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown extraction error',
+    };
   }
 });

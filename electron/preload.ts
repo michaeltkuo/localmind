@@ -13,6 +13,9 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.invoke('search:web', { query, maxResults }),
   // Config
   setBraveApiKey: (key: string) => ipcRenderer.invoke('config:setBraveApiKey', key),
+  // Documents
+  extractTextFromDocument: (payload: { fileName: string; mimeType: string; bytes: number[] }) =>
+    ipcRenderer.invoke('documents:extractText', payload),
 });
 
 // Legacy alias for backward compatibility
@@ -30,6 +33,7 @@ export interface ElectronAPI {
   sendChatMessage: (model: string, messages: any[]) => Promise<{ success: boolean; response?: any; error?: string }>;
   search: (query: string, maxResults: number) => Promise<{ success: boolean; results: any[]; error?: string }>;
   setBraveApiKey: (key: string) => Promise<{ ok: boolean }>;
+  extractTextFromDocument: (payload: { fileName: string; mimeType: string; bytes: number[] }) => Promise<{ success: boolean; text?: string; error?: string }>;
 }
 
 declare global {

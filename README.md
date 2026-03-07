@@ -1,4 +1,4 @@
-# LocalMind 🧠
+# LocalMind
 
 **Your private AI assistant. All conversations stay on your computer.**
 

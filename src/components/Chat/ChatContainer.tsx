@@ -8,6 +8,11 @@ export const ChatContainer: React.FC = () => {
   const { 
     currentConversation, 
     sendMessage, 
+    uploadDocument,
+    isIndexingDocument,
+    indexingProgress,
+    indexingFileName,
+    indexingConversationId,
     isStreaming,
     modelLoaded,
     error,
@@ -29,8 +34,8 @@ export const ChatContainer: React.FC = () => {
     });
   }, [currentConversation?.messages, isStreaming]);
 
-  const handleSendMessage = (content: string) => {
-    sendMessage(content);
+  const handleSendMessage = (content: string, forceSearch = false) => {
+    sendMessage(content, forceSearch);
   };
 
   if (error) {
@@ -67,6 +72,8 @@ export const ChatContainer: React.FC = () => {
         </div>
         <ChatInput 
           onSendMessage={handleSendMessage} 
+          onUploadDocument={uploadDocument}
+          isIndexingDocument={isIndexingDocument}
           disabled={!modelLoaded}
           isStreaming={isStreaming}
           isSearching={isSearching}
@@ -92,7 +99,7 @@ export const ChatContainer: React.FC = () => {
     <div className="flex-1 flex flex-col h-full">
       {/* Chat header with actions - Phase 2B: Enhanced with mode indicator */}
       {currentConversation && currentConversation.messages.length > 0 && (
-        <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3">
+        <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-3 py-2">
           <div className="flex items-center justify-between max-w-full">
             {/* Left: Model info + capabilities */}
             <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -103,16 +110,14 @@ export const ChatContainer: React.FC = () => {
               {/* Capability badges */}
               <div className="flex items-center gap-2 flex-shrink-0">
                 {supportsTools(selectedModel) && (
-                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 text-xs font-medium">
-                    <span>🛠️</span>
-                    <span>Tools</span>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 text-xs font-medium">
+                    Tools
                   </span>
                 )}
                 
                 {settings.webSearchEnabled && (
-                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 text-xs font-medium">
-                    <span>🌐</span>
-                    <span>Web Search</span>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 text-xs font-medium">
+                    Web
                   </span>
                 )}
               </div>
@@ -127,7 +132,7 @@ export const ChatContainer: React.FC = () => {
             {/* Export Buttons */}
             <button
               onClick={() => handleExport('json')}
-              className="text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700 px-3 py-1 rounded transition-colors flex items-center gap-1"
+              className="text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700 px-2.5 py-1 rounded-md transition-colors flex items-center gap-1"
               title="Export as JSON"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -137,7 +142,7 @@ export const ChatContainer: React.FC = () => {
             </button>
             <button
               onClick={() => handleExport('markdown')}
-              className="text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700 px-3 py-1 rounded transition-colors flex items-center gap-1"
+              className="text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700 px-2.5 py-1 rounded-md transition-colors flex items-center gap-1"
               title="Export as Markdown"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -150,7 +155,7 @@ export const ChatContainer: React.FC = () => {
             {isStreaming && (
               <button
                 onClick={stopStreaming}
-                className="text-sm text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-900 px-3 py-1 rounded transition-colors flex items-center gap-1"
+                className="text-sm text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-900 px-2.5 py-1 rounded-md transition-colors flex items-center gap-1"
                 title="Stop generation"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -164,7 +169,7 @@ export const ChatContainer: React.FC = () => {
             {/* Clear Button */}
             <button
               onClick={handleClearConversation}
-              className="text-sm text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900 px-3 py-1 rounded transition-colors flex items-center gap-1"
+              className="text-sm text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900 px-2.5 py-1 rounded-md transition-colors flex items-center gap-1"
               title="Delete conversation"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -178,8 +183,8 @@ export const ChatContainer: React.FC = () => {
       )}
 
       {/* Messages area */}
-      <div className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 p-4">
-        <div className="max-w-4xl mx-auto">
+      <div className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 px-3 py-2">
+        <div className="max-w-3xl mx-auto">
           {currentConversation.messages.length === 0 ? (
             <div className="text-center text-gray-500 dark:text-gray-400 mt-8">
               <p>No messages yet. Start the conversation!</p>
@@ -195,6 +200,7 @@ export const ChatContainer: React.FC = () => {
               />
             ))
           )}
+
           <div ref={messagesEndRef} />
         </div>
       </div>
@@ -202,6 +208,10 @@ export const ChatContainer: React.FC = () => {
       {/* Input area */}
       <ChatInput 
         onSendMessage={handleSendMessage} 
+        onUploadDocument={uploadDocument}
+        isIndexingDocument={isIndexingDocument}
+        indexingFileName={currentConversation.id === indexingConversationId ? indexingFileName : null}
+        indexingProgress={currentConversation.id === indexingConversationId ? indexingProgress : null}
         disabled={!modelLoaded}
         isStreaming={isStreaming}
         isSearching={isSearching}

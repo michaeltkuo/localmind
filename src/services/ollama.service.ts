@@ -24,7 +24,16 @@ interface OllamaChatResponse {
   eval_duration?: number;
 }
 
+interface OllamaEmbedResponse {
+  embeddings?: number[][];
+  embedding?: number[];
+}
+
 export class OllamaService {
+  private static normalizeModelName(modelName: string): string {
+    return modelName.split(':')[0].trim().toLowerCase();
+  }
+
   /**
    * Check if Ollama is running and available
    */
@@ -463,5 +472,84 @@ export class OllamaService {
       console.error('Error pulling model:', error);
       throw error;
     }
+  }
+
+  /**
+   * Generate embeddings for one or more inputs
+   */
+  static async embed(
+    model: string,
+    input: string | string[],
+    signal?: AbortSignal
+  ): Promise<number[][]> {
+    const payload = {
+      model,
+      input,
+      // NOTE: keep_alive intentionally omitted — holding the embedding model warm
+      // while a large input arrives causes the model runner process to OOM and
+      // return EOF. Let Ollama manage model lifecycle on its own.
+    };
+
+    const response = await fetch(`${OLLAMA_BASE_URL}/api/embed`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+      signal,
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Failed to generate embeddings: HTTP ${response.status} ${text}`);
+    }
+
+    const data: OllamaEmbedResponse = await response.json();
+    if (Array.isArray(data.embeddings)) {
+      return data.embeddings;
+    }
+    if (Array.isArray(data.embedding)) {
+      return [data.embedding];
+    }
+
+    throw new Error('Invalid embedding response from Ollama');
+  }
+
+  /**
+   * Generate an embedding for a single string input
+   */
+  static async embedQuery(
+    model: string,
+    input: string,
+    signal?: AbortSignal
+  ): Promise<number[]> {
+    const embeddings = await this.embed(model, input, signal);
+    if (!embeddings[0]) {
+      throw new Error('No embedding returned for query');
+    }
+    return embeddings[0];
+  }
+
+  /**
+   * Ensure a model is available locally. Pulls it automatically if missing.
+   */
+  static async ensureModelAvailable(
+    modelName: string,
+    onProgress?: (progress: number) => void
+  ): Promise<void> {
+    const installedModels = await this.listModels();
+    const requested = this.normalizeModelName(modelName);
+
+    const exists = installedModels.some((model) => {
+      return this.normalizeModelName(model.name) === requested;
+    });
+
+    if (exists) {
+      return;
+    }
+
+    await this.pullModel(modelName, (progress) => {
+      onProgress?.(progress);
+    });
   }
 }
