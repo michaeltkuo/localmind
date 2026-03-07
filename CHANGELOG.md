@@ -1,3 +1,13 @@
+## [1.5.0](https://github.com/michaeltkuo/localmind/compare/v1.4.0...v1.5.0) (2026-03-07)
+
+### ✨ Features
+
+* P0 ChatGPT-style UX pass (sidebar actions, composer menu, theming, and tests) ([57554ac](https://github.com/michaeltkuo/localmind/commit/57554ac1d0424d824aebcbcc20e282898404127d))
+
+### 🐛 Bug Fixes
+
+* remove unused React imports in integration tests for CI type-check ([8b486b2](https://github.com/michaeltkuo/localmind/commit/8b486b2b2d169f2ae86f3ebf7ef27c85ca1381ab))
+
 ## [1.4.0](https://github.com/michaeltkuo/localmind/compare/v1.3.0...v1.4.0) (2026-03-07)
 
 ### ✨ Features
