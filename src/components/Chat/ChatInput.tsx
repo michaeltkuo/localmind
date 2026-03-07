@@ -99,7 +99,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           <DocumentUploadButton
             onUpload={onUploadDocument}
             disabled={disabled || isIndexingDocument}
-            className="h-8 w-8 px-0 py-0 border-0 rounded-md bg-transparent hover:bg-gray-100 dark:hover:bg-gray-600"
+            className="self-center h-8 w-8 px-0 py-0 border-0 rounded-md bg-transparent hover:bg-gray-100 dark:hover:bg-gray-600"
           />
 
           <textarea
@@ -115,7 +115,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           />
 
           {/* Button group */}
-          <div className="flex items-center gap-2">
+          <div className="self-center flex items-center gap-2">
             {/* Force search button - only show if web search enabled */}
             {webSearchEnabled && !isStreaming && !isSearching && input.trim() && (
               <button
@@ -145,13 +145,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             </button>
           </div>
         </div>
-        
-        {/* Help text when force search available */}
-        {webSearchEnabled && !isStreaming && !isSearching && (
-          <div className="text-xs text-gray-500 dark:text-gray-400">
-            Web runs a forced search; send uses normal routing.
-          </div>
-        )}
       </div>
     </form>
   );

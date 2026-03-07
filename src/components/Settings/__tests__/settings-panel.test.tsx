@@ -40,5 +40,6 @@ describe('SettingsPanel', () => {
     expect(html).toContain('Chunk Size');
     expect(html).toContain('Chunk Overlap');
     expect(html).toContain('Max Context Tokens');
+    expect(html).toContain('Show advanced settings');
   });
 });

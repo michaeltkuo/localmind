@@ -24,6 +24,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [showApiKey, setShowApiKey] = useState(false);
   const [showDebugPanel, setShowDebugPanel] = useState(false); // Phase 3B
   const [debugStats, setDebugStats] = useState(debugService.getStats()); // Phase 3B
+  const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
 
   const handleSave = () => {
     onUpdateSettings(localSettings);
@@ -186,8 +187,18 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
               </div>
             </div>
 
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => setShowAdvancedSettings((prev) => !prev)}
+                className="w-full px-3 py-2 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              >
+                {showAdvancedSettings ? 'Hide advanced settings' : 'Show advanced settings'}
+              </button>
+            </div>
+
             {/* Web Search Section */}
-            <div className="pt-4 border-t border-gray-200 dark:border-gray-600">
+            <div className={`${showAdvancedSettings ? 'pt-4 border-t border-gray-200 dark:border-gray-600' : 'hidden'}`}>
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">🌐 Web Search</h3>
               
               {/* Search Mode Selector */}
@@ -309,7 +320,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
             </div>
 
             {/* Document RAG Section */}
-            <div className="pt-4 border-t border-gray-200 dark:border-gray-600">
+            <div className={`${showAdvancedSettings ? 'pt-4 border-t border-gray-200 dark:border-gray-600' : 'hidden'}`}>
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">📚 Document Retrieval</h3>
 
               <div className="space-y-4">
@@ -398,7 +409,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
             </div>
 
             {/* Phase 3B: Debug Panel */}
-            <div className="pt-4 border-t border-gray-200 dark:border-gray-600">
+            <div className={`${showAdvancedSettings ? 'pt-4 border-t border-gray-200 dark:border-gray-600' : 'hidden'}`}>
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">🐛 Debug & Logging</h3>
               
               {/* Enable Debug Mode */}

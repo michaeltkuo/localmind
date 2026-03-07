@@ -14,7 +14,7 @@ describe('ChatInput upload behavior', () => {
       />
     );
 
-    const match = html.match(/<button[^>]*title="Upload document"[^>]*>/);
+    const match = html.match(/<button[^>]*title="Add attachment"[^>]*>/);
     expect(match).not.toBeNull();
     expect(match?.[0]).not.toMatch(/\sdisabled(=|\s|>)/);
   });
@@ -32,7 +32,7 @@ describe('ChatInput upload behavior', () => {
       />
     );
 
-    const match = html.match(/<button[^>]*title="Upload document"[^>]*>/);
+    const match = html.match(/<button[^>]*title="Add attachment"[^>]*>/);
     expect(match).not.toBeNull();
     expect(match?.[0]).toMatch(/\sdisabled(=|\s|>)/);
   });

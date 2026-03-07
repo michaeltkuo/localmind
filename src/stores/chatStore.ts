@@ -57,6 +57,9 @@ interface ChatStore {
   stopStreaming: () => void;
   loadConversation: (id: string) => Promise<void>;
   deleteConversation: (id: string) => Promise<void>;
+  renameConversation: (id: string, title: string) => Promise<void>;
+  togglePinConversation: (id: string) => Promise<void>;
+  toggleArchiveConversation: (id: string) => Promise<void>;
   setSelectedModel: (model: string) => void;
   updateSettings: (settings: Partial<ChatSettings>) => void;
   toggleTheme: () => void;
@@ -208,6 +211,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       createdAt: Date.now(),
       updatedAt: Date.now(),
       model: get().selectedModel,
+      pinned: false,
+      archived: false,
     };
 
     set({ 
@@ -799,6 +804,105 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     // If deleted conversation was current, clear it
     if (get().currentConversation?.id === id) {
       set({ currentConversation: null, uploadedDocuments: [], documentChunks: [] });
+    }
+  },
+
+  // Rename a conversation
+  renameConversation: async (id: string, title: string) => {
+    const normalizedTitle = title.trim() || 'New Conversation';
+    const conversations = get().conversations.map((conversation) =>
+      conversation.id === id
+        ? {
+            ...conversation,
+            title: normalizedTitle,
+            updatedAt: Date.now(),
+          }
+        : conversation
+    );
+
+    const nextCurrentConversation =
+      get().currentConversation?.id === id
+        ? {
+            ...get().currentConversation!,
+            title: normalizedTitle,
+            updatedAt: Date.now(),
+          }
+        : get().currentConversation;
+
+    set({
+      conversations,
+      currentConversation: nextCurrentConversation,
+    });
+
+    const updatedConversation = conversations.find((conversation) => conversation.id === id);
+    if (updatedConversation) {
+      StorageService.saveConversation(updatedConversation);
+    }
+  },
+
+  togglePinConversation: async (id: string) => {
+    const now = Date.now();
+    const conversations = get().conversations.map((conversation) =>
+      conversation.id === id
+        ? {
+            ...conversation,
+            pinned: !conversation.pinned,
+            updatedAt: now,
+          }
+        : conversation
+    );
+
+    const nextCurrentConversation =
+      get().currentConversation?.id === id
+        ? {
+            ...get().currentConversation!,
+            pinned: !get().currentConversation!.pinned,
+            updatedAt: now,
+          }
+        : get().currentConversation;
+
+    set({
+      conversations,
+      currentConversation: nextCurrentConversation,
+    });
+
+    const updatedConversation = conversations.find((conversation) => conversation.id === id);
+    if (updatedConversation) {
+      StorageService.saveConversation(updatedConversation);
+    }
+  },
+
+  toggleArchiveConversation: async (id: string) => {
+    const now = Date.now();
+    const conversations = get().conversations.map((conversation) =>
+      conversation.id === id
+        ? {
+            ...conversation,
+            archived: !conversation.archived,
+            pinned: conversation.archived ? conversation.pinned : false,
+            updatedAt: now,
+          }
+        : conversation
+    );
+
+    const nextCurrentConversation =
+      get().currentConversation?.id === id
+        ? {
+            ...get().currentConversation!,
+            archived: !get().currentConversation!.archived,
+            pinned: get().currentConversation!.archived ? get().currentConversation!.pinned : false,
+            updatedAt: now,
+          }
+        : get().currentConversation;
+
+    set({
+      conversations,
+      currentConversation: nextCurrentConversation,
+    });
+
+    const updatedConversation = conversations.find((conversation) => conversation.id === id);
+    if (updatedConversation) {
+      StorageService.saveConversation(updatedConversation);
     }
   },
 

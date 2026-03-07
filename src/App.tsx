@@ -12,6 +12,9 @@ function App() {
     createNewConversation,
     loadConversation,
     deleteConversation,
+    renameConversation,
+    togglePinConversation,
+    toggleArchiveConversation,
     currentConversation,
     conversations,
     selectedModel,
@@ -40,6 +43,8 @@ function App() {
     // Apply initial theme
     if (theme === 'dark') {
       document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
     }
 
     // Keyboard shortcuts
@@ -69,10 +74,10 @@ function App() {
 
   if (isLoading) {
     return (
-      <div className="h-screen flex items-center justify-center bg-gray-50">
+      <div className={`h-screen flex items-center justify-center ${theme === 'dark' ? 'dark bg-gray-900' : 'bg-gray-50'}`}>
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
+          <p className="text-gray-600 dark:text-gray-300">Loading...</p>
         </div>
       </div>
     );
@@ -84,7 +89,7 @@ function App() {
         {/* Main content with sidebar */}
         <div className="flex-1 flex overflow-hidden">
           {/* Sidebar */}
-          <aside className="w-64 flex-shrink-0 flex flex-col border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+          <aside className="w-80 flex-shrink-0 flex flex-col border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
             <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700 space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <h1 className="text-base font-semibold text-gray-900 dark:text-white">LocalMind</h1>
@@ -154,6 +159,9 @@ function App() {
                 currentConversationId={currentConversation?.id || null}
                 onSelectConversation={loadConversation}
                 onDeleteConversation={deleteConversation}
+                onRenameConversation={renameConversation}
+                onTogglePinConversation={togglePinConversation}
+                onToggleArchiveConversation={toggleArchiveConversation}
                 onNewConversation={createNewConversation}
               />
             </div>
