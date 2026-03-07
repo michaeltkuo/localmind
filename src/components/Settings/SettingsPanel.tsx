@@ -50,6 +50,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
       debugMode: false,
       maxSearchResults: 8,
       searchTimeout: 10000,
+      ragEnabled: true,
+      ragTopK: 5,
+      ragChunkSize: 3000,
+      ragChunkOverlap: 200,
+      ragMaxContextTokens: 8000,
     };
     setLocalSettings(defaultSettings);
   };
@@ -301,6 +306,95 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   </div>
                 </>
               )}
+            </div>
+
+            {/* Document RAG Section */}
+            <div className="pt-4 border-t border-gray-200 dark:border-gray-600">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">📚 Document Retrieval</h3>
+
+              <div className="space-y-4">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={localSettings.ragEnabled ?? true}
+                    onChange={(e) => setLocalSettings({ ...localSettings, ragEnabled: e.target.checked })}
+                    className="rounded"
+                  />
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Enable document retrieval (RAG)
+                  </span>
+                </label>
+
+                {localSettings.ragEnabled !== false && (
+                  <>
+                    <div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Embedding model is managed automatically by LocalMind.
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Retrieved Chunks (Top K): {localSettings.ragTopK || 5}
+                      </label>
+                      <input
+                        type="range"
+                        min="1"
+                        max="10"
+                        step="1"
+                        value={localSettings.ragTopK || 5}
+                        onChange={(e) => setLocalSettings({ ...localSettings, ragTopK: parseInt(e.target.value) })}
+                        className="w-full h-2 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Chunk Size: {localSettings.ragChunkSize || 3000}
+                      </label>
+                      <input
+                        type="range"
+                        min="500"
+                        max="8000"
+                        step="100"
+                        value={localSettings.ragChunkSize || 3000}
+                        onChange={(e) => setLocalSettings({ ...localSettings, ragChunkSize: parseInt(e.target.value) })}
+                        className="w-full h-2 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Chunk Overlap: {localSettings.ragChunkOverlap || 200}
+                      </label>
+                      <input
+                        type="range"
+                        min="0"
+                        max="600"
+                        step="50"
+                        value={localSettings.ragChunkOverlap || 200}
+                        onChange={(e) => setLocalSettings({ ...localSettings, ragChunkOverlap: parseInt(e.target.value) })}
+                        className="w-full h-2 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Max Context Tokens: {localSettings.ragMaxContextTokens || 8000}
+                      </label>
+                      <input
+                        type="range"
+                        min="1000"
+                        max="32000"
+                        step="500"
+                        value={localSettings.ragMaxContextTokens || 8000}
+                        onChange={(e) => setLocalSettings({ ...localSettings, ragMaxContextTokens: parseInt(e.target.value) })}
+                        className="w-full h-2 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer"
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
 
             {/* Phase 3B: Debug Panel */}

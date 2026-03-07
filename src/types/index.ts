@@ -28,6 +28,7 @@ export interface Message {
   role: 'user' | 'assistant' | 'system' | 'tool';
   content: string;
   timestamp: number;
+  attachments?: MessageAttachment[];
   searchResults?: SearchResult[];
   tool_calls?: ToolCall[]; // For assistant messages that call tools
   tool_call_id?: string; // For tool result messages
@@ -41,6 +42,40 @@ export interface SearchResult {
   title: string;
   snippet: string;
   url: string;
+}
+
+export interface UploadedDocument {
+  id: string;
+  conversationId: string;
+  name: string;
+  originalName?: string;
+  mimeType: string;
+  sizeBytes: number;
+  uploadedAt: number;
+  chunkCount: number;
+  embeddingModel: string;
+}
+
+export interface MessageAttachment {
+  documentId: string;
+  name: string;
+  mimeType: string;
+  sizeBytes: number;
+}
+
+export interface DocumentChunk {
+  id: string;
+  conversationId: string;
+  documentId: string;
+  chunkIndex: number;
+  content: string;
+  embedding: number[];
+  tokenEstimate: number;
+}
+
+export interface RetrievedChunk {
+  chunk: DocumentChunk;
+  score: number;
 }
 
 export interface Conversation {
@@ -81,6 +116,12 @@ export interface ChatSettings {
   debugMode?: boolean;
   maxSearchResults?: number;
   searchTimeout?: number;
+  ragEnabled?: boolean;
+  embeddingModel?: string;
+  ragTopK?: number;
+  ragChunkSize?: number;
+  ragChunkOverlap?: number;
+  ragMaxContextTokens?: number;
 }
 
 export interface AppState {

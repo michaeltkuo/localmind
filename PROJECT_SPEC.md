@@ -1,4 +1,4 @@
-# LocalMind 🧠 - Desktop Application Specification
+# LocalMind - Desktop Application Specification
 
 ## Project Overview
 **LocalMind** is a **native desktop application** (not a web app) that provides a ChatGPT-like interface using locally hosted open-source LLM models, ensuring privacy and offline functionality.
