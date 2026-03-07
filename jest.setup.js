@@ -40,3 +40,6 @@ Object.defineProperty(global, 'TextDecoder', {
   value: TextDecoder,
   writable: true,
 });
+
+// React 18 test environment flag for act(...)
+globalThis.IS_REACT_ACT_ENVIRONMENT = true;

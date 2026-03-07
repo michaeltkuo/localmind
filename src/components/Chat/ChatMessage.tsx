@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { Children, Fragment, useMemo, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -13,16 +13,25 @@ interface ChatMessageProps {
    * highlighter is swapped for a lightweight plain pre/code block to avoid
    * re-tokenizing code on every rAF flush. Prism is restored on completion. */
   isActivelyStreaming?: boolean;
+  isLatestAssistant?: boolean;
+  onRegenerate?: () => void;
+  onContinue?: () => void;
 }
 
-export const ChatMessage: React.FC<ChatMessageProps> = ({ message, isActivelyStreaming = false }) => {
+export const ChatMessage: React.FC<ChatMessageProps> = ({
+  message,
+  isActivelyStreaming = false,
+  isLatestAssistant = false,
+  onRegenerate,
+  onContinue,
+}) => {
   const isUser = message.role === 'user';
   const [copied, setCopied] = useState(false);
   // Track which sources are actually cited inline to show a summary later
   const usedUrls = new Set<string>();
 
   // Preprocess content to remove References/Sources sections and track citations
-  const processedContent = React.useMemo(() => {
+  const processedContent = useMemo(() => {
     if (!message.searchResults || message.searchResults.length === 0) {
       return message.content;
     }
@@ -169,10 +178,10 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, isActivelyStr
                                   );
                                 }
                                 // Out of bounds citation - just show as text (model hallucinated)
-                                return <React.Fragment key={`text-${key}-${i}`}>[{num}]</React.Fragment>;
+                                return <Fragment key={`text-${key}-${i}`}>[{num}]</Fragment>;
                               }
                               // Return text parts (including empty strings for proper spacing)
-                              return <React.Fragment key={`text-${key}-${i}`}>{part}</React.Fragment>;
+                              return <Fragment key={`text-${key}-${i}`}>{part}</Fragment>;
                             });
                           }
                           
@@ -180,7 +189,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, isActivelyStr
                         };
                         
                         // Process each child
-                        const processedChildren = React.Children.map(children, (child, idx) => 
+                        const processedChildren = Children.map(children, (child, idx) => 
                           processNode(child, idx)
                         );
                         
@@ -292,6 +301,34 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, isActivelyStr
                     </div>
                   </div>
                 )}
+
+                {/* Message action bar */}
+                {!message.status && (
+                  <div className="mt-2 flex items-center gap-2 text-xs">
+                    <button
+                      onClick={handleCopy}
+                      className="px-2 py-1 rounded border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700 transition-colors"
+                    >
+                      {copied ? 'Copied' : 'Copy'}
+                    </button>
+                    {isLatestAssistant && onRegenerate && (
+                      <button
+                        onClick={onRegenerate}
+                        className="px-2 py-1 rounded border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700 transition-colors"
+                      >
+                        Regenerate
+                      </button>
+                    )}
+                    {isLatestAssistant && onContinue && (
+                      <button
+                        onClick={onContinue}
+                        className="px-2 py-1 rounded border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700 transition-colors"
+                      >
+                        Continue
+                      </button>
+                    )}
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -318,7 +355,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, isActivelyStr
           </button>
         </div>
         <div className={`text-xs text-gray-500 mt-1 ${isUser ? 'text-right' : 'text-left'}`}>
-          {new Date(message.timestamp).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', second: '2-digit' })}
+          {new Date(message.timestamp).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
         </div>
       </div>
     </div>

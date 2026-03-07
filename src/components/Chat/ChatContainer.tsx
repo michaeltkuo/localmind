@@ -95,6 +95,23 @@ export const ChatContainer: React.FC = () => {
     }
   };
 
+  const handleRegenerate = (assistantMessageIndex: number) => {
+    if (!currentConversation || isStreaming) return;
+
+    for (let index = assistantMessageIndex - 1; index >= 0; index -= 1) {
+      const message = currentConversation.messages[index];
+      if (message.role === 'user') {
+        sendMessage(message.content, false);
+        return;
+      }
+    }
+  };
+
+  const handleContinue = () => {
+    if (isStreaming) return;
+    sendMessage('Continue.', false);
+  };
+
   return (
     <div className="flex-1 flex flex-col h-full">
       {/* Chat header with actions - Phase 2B: Enhanced with mode indicator */}
@@ -196,6 +213,19 @@ export const ChatContainer: React.FC = () => {
                 message={message}
                 isActivelyStreaming={
                   isStreaming && index === currentConversation.messages.length - 1
+                }
+                isLatestAssistant={
+                  message.role === 'assistant' && index === currentConversation.messages.length - 1
+                }
+                onRegenerate={
+                  message.role === 'assistant'
+                    ? () => handleRegenerate(index)
+                    : undefined
+                }
+                onContinue={
+                  message.role === 'assistant' && index === currentConversation.messages.length - 1
+                    ? handleContinue
+                    : undefined
                 }
               />
             ))

@@ -14,4 +14,14 @@ describe('DocumentUploadButton', () => {
     expect(html).toContain('.pdf');
     expect(html).toContain('.docx');
   });
+
+  test('renders plus attachment trigger', () => {
+    const html = renderToStaticMarkup(
+      <DocumentUploadButton onUpload={() => {}} />
+    );
+
+    expect(html).toContain('title="Add attachment"');
+    expect(html).toContain('aria-label="Add attachment"');
+    expect(html).toContain('viewBox="0 0 24 24"');
+  });
 });
