@@ -15,6 +15,7 @@ function App() {
     renameConversation,
     togglePinConversation,
     toggleArchiveConversation,
+    refreshModels,
     currentConversation,
     conversations,
     selectedModel,
@@ -35,6 +36,7 @@ function App() {
   } = useChatStore();
 
   const [showSettings, setShowSettings] = useState(false);
+  const [searchFocusToken, setSearchFocusToken] = useState(0);
   const modelStatus = getModelStatus();
 
   useEffect(() => {
@@ -65,6 +67,12 @@ function App() {
       if ((e.metaKey || e.ctrlKey) && e.key === 'd') {
         e.preventDefault();
         toggleTheme();
+      }
+
+      // Cmd/Ctrl + F: Focus sidebar search
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'f') {
+        e.preventDefault();
+        setSearchFocusToken((value) => value + 1);
       }
     };
 
@@ -164,6 +172,7 @@ function App() {
                 onTogglePinConversation={togglePinConversation}
                 onToggleArchiveConversation={toggleArchiveConversation}
                 onNewConversation={createNewConversation}
+                searchFocusToken={searchFocusToken}
               />
             </div>
           </aside>
@@ -182,6 +191,7 @@ function App() {
             selectedModel={selectedModel}
             onUpdateSettings={updateSettings}
             onSelectModel={setSelectedModel}
+            onRefreshModels={refreshModels}
             onClose={() => setShowSettings(false)}
           />
         )}

@@ -475,6 +475,31 @@ export class OllamaService {
   }
 
   /**
+   * Delete a local model
+   */
+  static async deleteModel(modelName: string): Promise<void> {
+    try {
+      const response = await fetch(`${OLLAMA_BASE_URL}/api/delete`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: modelName,
+        }),
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`HTTP error! status: ${response.status}, message: ${text}`);
+      }
+    } catch (error) {
+      console.error('Error deleting model:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Generate embeddings for one or more inputs
    */
   static async embed(

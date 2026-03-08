@@ -66,6 +66,7 @@ interface ChatStore {
   renameConversation: (id: string, title: string) => Promise<void>;
   togglePinConversation: (id: string) => Promise<void>;
   toggleArchiveConversation: (id: string) => Promise<void>;
+  refreshModels: () => Promise<void>;
   setSelectedModel: (model: string) => void;
   updateSettings: (settings: Partial<ChatSettings>) => void;
   toggleTheme: () => void;
@@ -1122,6 +1123,22 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     const updatedConversation = conversations.find((conversation) => conversation.id === id);
     if (updatedConversation) {
       StorageService.saveConversation(updatedConversation);
+    }
+  },
+
+  refreshModels: async () => {
+    try {
+      const models = await OllamaService.listModels();
+      set({ availableModels: models });
+
+      const { selectedModel } = get();
+      const modelStillExists = models.some((model) => model.name === selectedModel);
+      if (!modelStillExists && models.length > 0) {
+        set({ selectedModel: models[0].name, modelLoaded: false });
+      }
+    } catch (error) {
+      console.error('Error refreshing models:', error);
+      set({ error: 'Failed to refresh models' });
     }
   },
 

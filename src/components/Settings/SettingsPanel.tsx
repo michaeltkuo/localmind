@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { ChatSettings, OllamaModel } from '../../types';
 import { supportsTools } from '../../constants/models';
 import { debugService } from '../../services/debug.service'; // Phase 3B
+import { OllamaService } from '../../services/ollama.service';
 
 interface SettingsPanelProps {
   settings: ChatSettings;
@@ -9,6 +10,7 @@ interface SettingsPanelProps {
   selectedModel: string;
   onUpdateSettings: (settings: Partial<ChatSettings>) => void;
   onSelectModel: (model: string) => void;
+  onRefreshModels?: () => Promise<void>;
   onClose: () => void;
 }
 
@@ -18,6 +20,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   selectedModel,
   onUpdateSettings,
   onSelectModel,
+  onRefreshModels,
   onClose,
 }) => {
   const [localSettings, setLocalSettings] = useState<ChatSettings>(settings);
@@ -25,6 +28,75 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [showDebugPanel, setShowDebugPanel] = useState(false); // Phase 3B
   const [debugStats, setDebugStats] = useState(debugService.getStats()); // Phase 3B
   const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
+  const [modelToDownload, setModelToDownload] = useState('');
+  const [isDownloadingModel, setIsDownloadingModel] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
+  const [modelActionBusyName, setModelActionBusyName] = useState<string | null>(null);
+  const [modelActionError, setModelActionError] = useState<string | null>(null);
+
+  const formatModelSize = (sizeBytes?: number): string => {
+    if (!sizeBytes || sizeBytes <= 0) {
+      return 'Unknown size';
+    }
+
+    const gb = sizeBytes / (1024 * 1024 * 1024);
+    return `${gb.toFixed(gb < 1 ? 2 : 1)} GB`;
+  };
+
+  const handleDownloadModel = async () => {
+    const modelName = modelToDownload.trim();
+    if (!modelName || isDownloadingModel) {
+      return;
+    }
+
+    setModelActionError(null);
+    setIsDownloadingModel(true);
+    setDownloadProgress(0);
+
+    try {
+      await OllamaService.pullModel(modelName, (progress) => {
+        setDownloadProgress(Math.max(0, Math.min(100, Math.round(progress))));
+      });
+
+      await onRefreshModels?.();
+      setModelToDownload('');
+      setDownloadProgress(100);
+    } catch (error) {
+      setModelActionError(error instanceof Error ? error.message : 'Failed to download model');
+    } finally {
+      setIsDownloadingModel(false);
+      window.setTimeout(() => setDownloadProgress(null), 500);
+    }
+  };
+
+  const handleDeleteModel = async (modelName: string) => {
+    if (modelActionBusyName) {
+      return;
+    }
+
+    if (!window.confirm(`Delete model "${modelName}" from local storage?`)) {
+      return;
+    }
+
+    setModelActionError(null);
+    setModelActionBusyName(modelName);
+
+    try {
+      await OllamaService.deleteModel(modelName);
+      await onRefreshModels?.();
+
+      if (selectedModel === modelName) {
+        const fallback = availableModels.find((model) => model.name !== modelName);
+        if (fallback) {
+          onSelectModel(fallback.name);
+        }
+      }
+    } catch (error) {
+      setModelActionError(error instanceof Error ? error.message : 'Failed to delete model');
+    } finally {
+      setModelActionBusyName(null);
+    }
+  };
 
   const handleSave = () => {
     onUpdateSettings(localSettings);
@@ -182,6 +254,84 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     <span className="text-yellow-600 dark:text-yellow-400">
                       ⚠️ This model doesn't support tool calling. Web search will be disabled.
                     </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="mt-4 p-3 rounded-lg bg-gray-50 dark:bg-gray-700/40 border border-gray-200 dark:border-gray-600 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Installed Models</h4>
+                  <button
+                    type="button"
+                    onClick={() => onRefreshModels?.()}
+                    className="text-xs px-2 py-1 rounded border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  >
+                    Refresh
+                  </button>
+                </div>
+
+                <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
+                  {availableModels.length === 0 ? (
+                    <p className="text-xs text-gray-500 dark:text-gray-400">No models installed.</p>
+                  ) : (
+                    availableModels.map((model) => (
+                      <div
+                        key={model.name}
+                        className="flex items-center justify-between gap-2 p-2 rounded bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-sm text-gray-900 dark:text-white truncate">{model.name}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">{formatModelSize(model.size)}</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteModel(model.name)}
+                          disabled={modelActionBusyName === model.name}
+                          className="text-xs px-2 py-1 rounded border border-red-300 dark:border-red-700 text-red-600 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50"
+                        >
+                          {modelActionBusyName === model.name ? 'Deleting...' : 'Delete'}
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <div className="pt-2 border-t border-gray-200 dark:border-gray-600 space-y-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Download model by name
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={modelToDownload}
+                      onChange={(e) => setModelToDownload(e.target.value)}
+                      placeholder="e.g. llama3.2:latest"
+                      className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleDownloadModel}
+                      disabled={isDownloadingModel || !modelToDownload.trim()}
+                      className="px-3 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-50"
+                    >
+                      {isDownloadingModel ? 'Downloading...' : 'Download'}
+                    </button>
+                  </div>
+
+                  {downloadProgress !== null && (
+                    <div className="space-y-1">
+                      <div className="h-2 w-full rounded bg-gray-200 dark:bg-gray-700 overflow-hidden">
+                        <div
+                          className="h-full bg-blue-600 transition-all"
+                          style={{ width: `${downloadProgress}%` }}
+                        />
+                      </div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">{downloadProgress}%</p>
+                    </div>
+                  )}
+
+                  {modelActionError && (
+                    <p className="text-xs text-red-600 dark:text-red-400">{modelActionError}</p>
                   )}
                 </div>
               </div>
