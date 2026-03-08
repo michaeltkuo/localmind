@@ -29,7 +29,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
   const [renameTitle, setRenameTitle] = useState('');
   const [showArchived, setShowArchived] = useState(false);
   const [openActionsConversationId, setOpenActionsConversationId] = useState<string | null>(null);
-  const [showSearchInput, setShowSearchInput] = useState(false);
+  const [showSearchModal, setShowSearchModal] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const getConversationPreview = (conversation: Conversation): string => {
@@ -41,10 +41,28 @@ export const ConversationList: React.FC<ConversationListProps> = ({
       return;
     }
 
-    setShowSearchInput(true);
-    searchInputRef.current?.focus();
-    searchInputRef.current?.select();
+    setShowSearchModal(true);
+    window.setTimeout(() => {
+      searchInputRef.current?.focus();
+      searchInputRef.current?.select();
+    }, 0);
   }, [searchFocusToken]);
+
+  useEffect(() => {
+    if (!showSearchModal) {
+      return;
+    }
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setShowSearchModal(false);
+        setSearchQuery('');
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [showSearchModal]);
 
   const escapedQuery = useMemo(() => searchQuery.trim().toLowerCase(), [searchQuery]);
 
@@ -111,11 +129,15 @@ export const ConversationList: React.FC<ConversationListProps> = ({
   );
 
   const filteredConversations = useMemo(() => {
+    return conversationsForTab;
+  }, [conversationsForTab]);
+
+  const searchResults = useMemo(() => {
     if (!escapedQuery) {
-      return conversationsForTab;
+      return sortedConversations;
     }
 
-    return conversationsForTab.filter((conversation) => {
+    return sortedConversations.filter((conversation) => {
       const title = getConversationPreview(conversation).toLowerCase();
       if (title.includes(escapedQuery)) {
         return true;
@@ -125,7 +147,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
         (message.content || '').toLowerCase().includes(escapedQuery)
       );
     });
-  }, [escapedQuery, conversationsForTab]);
+  }, [escapedQuery, sortedConversations]);
 
   const startRenaming = (conversation: Conversation) => {
     setRenamingConversationId(conversation.id);
@@ -149,10 +171,10 @@ export const ConversationList: React.FC<ConversationListProps> = ({
 
   return (
     <div className="flex flex-col bg-gray-50 dark:bg-gray-800">
-      <div className="px-3 pt-3 pb-2 space-y-1">
+      <div className="p-1.5 pt-3 pb-2 space-y-1">
         <button
           onClick={onNewConversation}
-          className="w-full px-3 py-2.5 rounded-2xl text-left text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-3"
+          className="w-full p-2.5 rounded-md text-left text-gray-900 dark:text-gray-100 hover:bg-white dark:hover:bg-gray-700 transition-colors flex items-center gap-3"
           title="New chat (⌘N)"
         >
           <span className="inline-flex h-6 w-6 items-center justify-center flex-shrink-0">
@@ -167,13 +189,13 @@ export const ConversationList: React.FC<ConversationListProps> = ({
         <button
           type="button"
           onClick={() => {
-            setShowSearchInput(true);
+            setShowSearchModal(true);
             window.setTimeout(() => {
               searchInputRef.current?.focus();
               searchInputRef.current?.select();
             }, 0);
           }}
-          className="w-full px-3 py-2.5 rounded-2xl text-left text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-3"
+          className="w-full p-2.5 rounded-md text-left text-gray-900 dark:text-gray-100 hover:bg-white dark:hover:bg-gray-700 transition-colors flex items-center gap-3"
           title="Search chats (⌘F)"
         >
           <span className="inline-flex h-6 w-6 items-center justify-center flex-shrink-0">
@@ -184,68 +206,6 @@ export const ConversationList: React.FC<ConversationListProps> = ({
           </span>
           <span className="text-[14px] font-medium leading-5">Search chats</span>
         </button>
-
-        <button
-          type="button"
-          className="w-full px-3 py-2.5 rounded-2xl text-left text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-3"
-          title="Images (coming soon)"
-        >
-          <span className="inline-flex h-6 w-6 items-center justify-center flex-shrink-0">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <rect x="3" y="5" width="18" height="16" rx="3" strokeWidth={2} />
-              <circle cx="9" cy="11" r="1.5" strokeWidth={2} />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 17l-5-5-6 6" />
-            </svg>
-          </span>
-          <span className="text-[14px] font-medium leading-5">Images</span>
-        </button>
-
-        <button
-          type="button"
-          className="w-full px-3 py-2.5 rounded-2xl text-left text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-3"
-          title="Apps (coming soon)"
-        >
-          <span className="inline-flex h-6 w-6 items-center justify-center flex-shrink-0">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <circle cx="8" cy="8" r="2.5" strokeWidth={2} />
-              <circle cx="16" cy="8" r="2.5" strokeWidth={2} />
-              <circle cx="8" cy="16" r="2.5" strokeWidth={2} />
-              <circle cx="16" cy="16" r="2.5" strokeWidth={2} />
-            </svg>
-          </span>
-          <span className="text-[14px] font-medium leading-5">Apps</span>
-        </button>
-
-        <button
-          type="button"
-          className="w-full px-3 py-2.5 rounded-2xl text-left text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-3"
-          title="Codex (coming soon)"
-        >
-          <span className="inline-flex h-6 w-6 items-center justify-center flex-shrink-0">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 3h8l5 9-5 9H8l-5-9 5-9z" />
-            </svg>
-          </span>
-          <span className="text-[14px] font-medium leading-5">Codex</span>
-        </button>
-
-        <input
-          ref={searchInputRef}
-          type="text"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Escape') {
-              setSearchQuery('');
-              setShowSearchInput(false);
-              searchInputRef.current?.blur();
-            }
-          }}
-          className={`${showSearchInput || escapedQuery ? 'mt-2 w-full' : 'hidden'} px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white`}
-          placeholder="Search conversations"
-          title="Search conversations (⌘F)"
-          aria-label="Search conversations"
-        />
 
         <p className="pt-2 text-[13px] font-medium text-gray-500 dark:text-gray-400">Your chats</p>
 
@@ -428,6 +388,95 @@ export const ConversationList: React.FC<ConversationListProps> = ({
           {conversationsForTab.length !== 1 ? 's' : ''}
         </div>
       </div>
+
+      {showSearchModal && (
+        <div
+          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm flex items-start justify-center pt-20 px-4"
+          onClick={() => {
+            setShowSearchModal(false);
+            setSearchQuery('');
+          }}
+        >
+          <div
+            className="w-full max-w-3xl rounded-2xl border border-gray-300 dark:border-gray-700 bg-gray-900 dark:bg-gray-800 shadow-2xl overflow-hidden"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="px-4 py-3 border-b border-gray-700 flex items-center gap-3">
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                className="flex-1 bg-transparent text-gray-100 placeholder-gray-400 text-sm focus:outline-none"
+                placeholder="Search chats..."
+                title="Search conversations (⌘F)"
+                aria-label="Search conversations"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSearchModal(false);
+                  setSearchQuery('');
+                }}
+                className="text-gray-400 hover:text-gray-200"
+                aria-label="Close search"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="p-3 max-h-[55vh] overflow-y-auto space-y-2">
+              <button
+                type="button"
+                onClick={() => {
+                  onNewConversation();
+                  setShowSearchModal(false);
+                  setSearchQuery('');
+                }}
+                className="w-full p-2.5 rounded-md text-left text-gray-100 bg-gray-700/60 hover:bg-gray-700 transition-colors flex items-center gap-3"
+              >
+                <span className="inline-flex h-5 w-5 items-center justify-center flex-shrink-0">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 20h9" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4 12.5-12.5z" />
+                  </svg>
+                </span>
+                <span className="text-[14px] font-medium leading-5">New chat</span>
+              </button>
+
+              {searchResults.length === 0 ? (
+                <p className="px-1 py-3 text-sm text-gray-400">No matching conversations</p>
+              ) : (
+                searchResults.map((conversation) => {
+                  const title = getConversationPreview(conversation);
+                  const messageMatch = getFirstMessageMatch(conversation);
+                  const showMessageMatch = Boolean(escapedQuery && messageMatch);
+
+                  return (
+                    <button
+                      key={`search-${conversation.id}`}
+                      type="button"
+                      onClick={() => {
+                        onSelectConversation(conversation.id);
+                        setShowSearchModal(false);
+                        setSearchQuery('');
+                      }}
+                      className="w-full text-left p-2.5 rounded-md hover:bg-gray-800 transition-colors"
+                    >
+                      <p className="text-[14px] font-medium leading-5 text-gray-100 truncate">{highlightText(title)}</p>
+                      {showMessageMatch && messageMatch && (
+                        <p className="mt-1 text-xs text-gray-400 line-clamp-2">{highlightText(messageMatch.snippet)}</p>
+                      )}
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
