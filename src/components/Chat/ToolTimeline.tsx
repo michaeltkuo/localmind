@@ -33,11 +33,11 @@ export const ToolTimeline: React.FC<ToolTimelineProps> = ({ events, isStreaming 
   }, [events]);
 
   return (
-    <div className="mb-3 rounded-md border border-gray-200 dark:border-gray-700 bg-white/60 dark:bg-gray-900/40">
+    <div className="mb-3 rounded-xl bg-gray-100 dark:bg-gray-800/60">
       <button
         type="button"
         onClick={() => setExpanded((previous) => !previous)}
-        className="w-full px-3 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300 flex items-center justify-between focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+        className="w-full px-3 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300 flex items-center justify-between focus-visible:outline-none"
         aria-expanded={expanded}
         aria-controls={timelineId}
       >

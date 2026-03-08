@@ -86,9 +86,9 @@ export const ConversationList: React.FC<ConversationListProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-800">
+    <div className="flex flex-col bg-gray-50 dark:bg-gray-800">
       {/* New Chat Button */}
-      <div className="p-3 border-b border-gray-200 dark:border-gray-700">
+      <div className="p-3">
         <button
           onClick={onNewConversation}
           className="w-full px-3 py-2 bg-blue-600 text-white rounded-md font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-1.5"
@@ -136,7 +136,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
       </div>
 
       {/* Conversations List */}
-      <div className="flex-1 overflow-y-auto">
+      <div>
         {filteredConversations.length === 0 ? (
           <div className="p-3 text-center text-gray-500 dark:text-gray-300 text-sm">
             {conversationsForTab.length === 0
@@ -151,7 +151,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
                 className={`
                   group relative mb-1 p-2.5 rounded-md cursor-pointer transition-colors
                   ${currentConversationId === conversation.id 
-                    ? 'bg-white dark:bg-gray-700 shadow-sm border border-blue-200 dark:border-blue-500' 
+                    ? 'bg-white dark:bg-gray-700 shadow-sm' 
                     : 'hover:bg-white dark:hover:bg-gray-700'
                   }
                 `}
@@ -190,14 +190,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
                         </p>
                       </div>
                     )}
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="text-xs text-gray-500 dark:text-gray-300 whitespace-nowrap">
-                        {formatDate(conversation.updatedAt)}
-                      </span>
-                      <span className="text-xs text-gray-400 dark:text-gray-400 whitespace-nowrap">
-                        {conversation.messages.length} messages
-                      </span>
-                    </div>
+
                   </div>
 
                   {/* Action menu */}
@@ -275,7 +268,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
       </div>
 
       {/* Footer */}
-      <div className="p-3 border-t border-gray-200 dark:border-gray-700">
+      <div className="sticky bottom-0 p-3 bg-gray-50 dark:bg-gray-800">
         <div className="text-xs text-gray-500 dark:text-gray-400 text-center">
           {conversationsForTab.length} {showArchived ? 'archived' : 'active'} conversation{conversationsForTab.length !== 1 ? 's' : ''}
         </div>

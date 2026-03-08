@@ -90,7 +90,8 @@ function App() {
         <div className="flex-1 flex overflow-hidden">
           {/* Sidebar */}
           <aside className="w-80 flex-shrink-0 flex flex-col border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
-            <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700 space-y-2">
+            <div className="flex-1 overflow-y-auto">
+            <div className="sticky top-0 z-10 px-3 py-2 bg-gray-50 dark:bg-gray-800 space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <h1 className="text-base font-semibold text-gray-900 dark:text-white">LocalMind</h1>
                 <div className="flex items-center gap-1">
@@ -153,8 +154,8 @@ function App() {
               </div>
             </div>
 
-            <div className="flex-1 min-h-0">
-              <ConversationList
+
+            <ConversationList
                 conversations={conversations}
                 currentConversationId={currentConversation?.id || null}
                 onSelectConversation={loadConversation}

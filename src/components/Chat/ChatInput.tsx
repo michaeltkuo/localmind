@@ -11,6 +11,7 @@ interface ChatInputProps {
   isStreaming?: boolean;
   isSearching?: boolean;
   webSearchEnabled?: boolean;
+  layout?: 'bottom' | 'centered';
 }
 
 export const ChatInput: React.FC<ChatInputProps> = ({ 
@@ -23,6 +24,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   isStreaming = false,
   isSearching = false,
   webSearchEnabled = false, // Phase 2B: Now used for force search button
+  layout = 'bottom',
 }) => {
   const [input, setInput] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -64,14 +66,23 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   }, [input]);
 
   return (
-    <form onSubmit={(e) => handleSubmit(e, false)} className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2">
+    <form
+      onSubmit={(e) => handleSubmit(e, false)}
+      className={`${
+        layout === 'centered'
+          ? 'w-full max-w-3xl mx-auto'
+          : 'bg-white/80 dark:bg-gray-900/80 backdrop-blur px-3 py-3'
+      }`}
+    >
       <div className="flex flex-col gap-2 max-w-4xl mx-auto">
 
         {/* File attachment pill — shows during indexing and while file is ready-to-send */}
         {indexingFileName && (
-          <div className="flex items-center gap-3 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
-            <div className="w-8 h-8 rounded-md bg-red-500 flex-shrink-0 flex items-center justify-center text-sm">
-              📄
+          <div className="flex items-center gap-3 px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-800/80">
+            <div className="w-8 h-8 rounded-md bg-red-500 flex-shrink-0 flex items-center justify-center text-white">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 3h7l5 5v13a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1z" />
+              </svg>
             </div>
             <div className="min-w-0 flex-1">
               <div className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">{indexingFileName}</div>
@@ -95,11 +106,11 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         )}
 
         {/* Main input row */}
-        <div className="flex items-end rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-2 py-1.5 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent transition-colors">
+        <div className="flex items-end rounded-3xl bg-gray-100 dark:bg-gray-800 px-3 py-2 transition-colors">
           <DocumentUploadButton
             onUpload={onUploadDocument}
             disabled={disabled || isIndexingDocument}
-            className="self-center h-8 w-8 px-0 py-0 border-0 rounded-md bg-transparent hover:bg-gray-100 dark:hover:bg-gray-600"
+            className="self-end bg-gray-200/80 dark:bg-gray-700/70 text-gray-700 dark:text-gray-200 hover:bg-gray-300/90 dark:hover:bg-gray-600/90"
           />
 
           <textarea
@@ -109,19 +120,19 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             onKeyDown={handleKeyDown}
             placeholder={isSearching ? "Searching the web..." : isStreaming ? "Waiting for response..." : "Ask anything"}
             disabled={disabled || isStreaming || isSearching}
-            className="flex-1 resize-none border-0 bg-transparent px-2.5 py-1.5 min-h-9 max-h-32 overflow-y-auto scrollbar-hide text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none disabled:cursor-not-allowed"
+            className="flex-1 resize-none border-0 bg-transparent px-2.5 py-1.5 min-h-9 max-h-48 overflow-y-auto scrollbar-hide text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none disabled:cursor-not-allowed"
             rows={1}
             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
           />
 
           {/* Button group */}
-          <div className="self-center flex items-center gap-2">
+          <div className="self-end flex items-center gap-2 pb-0.5">
             {/* Force search button - only show if web search enabled */}
             {webSearchEnabled && !isStreaming && !isSearching && input.trim() && (
               <button
                 type="button"
                 onClick={handleForceSearch}
-                className="h-8 px-3 rounded-md bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 text-sm font-medium hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors"
+                className="h-8 px-3 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 text-sm font-medium hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
                 title="Search the web for this query"
               >
                 Web
@@ -132,7 +143,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             <button
               type="submit"
               disabled={!input.trim() || disabled || isStreaming || isSearching}
-              className="h-8 w-8 rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors inline-flex items-center justify-center"
+              className="h-10 w-10 rounded-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:opacity-90 disabled:bg-gray-400 dark:disabled:bg-gray-600 disabled:text-gray-200 dark:disabled:text-gray-300 disabled:cursor-not-allowed transition-colors inline-flex items-center justify-center"
               title="Send message"
             >
               {isSearching ? (

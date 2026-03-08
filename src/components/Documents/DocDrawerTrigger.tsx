@@ -17,7 +17,7 @@ export const DocDrawerTrigger: React.FC<DocDrawerTriggerProps> = ({
   }
 
   return (
-    <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2">
+    <div className="bg-transparent px-3 py-2">
       <div className="max-w-3xl mx-auto flex items-center gap-2 overflow-x-auto">
         {documents.map((document) => (
           <div
