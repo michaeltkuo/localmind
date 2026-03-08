@@ -1,14 +1,20 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
 import { useChatStore } from '../../stores/chatStore';
 import { supportsTools } from '../../constants/models';
+import { DocDrawerTrigger } from '../Documents/DocDrawerTrigger';
+import { DocDrawer } from '../Documents/DocDrawer';
 
 export const ChatContainer: React.FC = () => {
   const { 
     currentConversation, 
     sendMessage, 
+    regenerateAt,
+    editAndResubmit,
     uploadDocument,
+    removeDocument,
+    uploadedDocuments,
     isIndexingDocument,
     indexingProgress,
     indexingFileName,
@@ -25,6 +31,7 @@ export const ChatContainer: React.FC = () => {
   } = useChatStore();
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [isDocDrawerOpen, setIsDocDrawerOpen] = useState(false);
 
   // Auto-scroll to bottom when new messages arrive
   // Use instant scroll during streaming for better responsiveness
@@ -96,15 +103,7 @@ export const ChatContainer: React.FC = () => {
   };
 
   const handleRegenerate = (assistantMessageIndex: number) => {
-    if (!currentConversation || isStreaming) return;
-
-    for (let index = assistantMessageIndex - 1; index >= 0; index -= 1) {
-      const message = currentConversation.messages[index];
-      if (message.role === 'user') {
-        sendMessage(message.content, false);
-        return;
-      }
-    }
+    regenerateAt(assistantMessageIndex);
   };
 
   const handleContinue = () => {
@@ -112,8 +111,12 @@ export const ChatContainer: React.FC = () => {
     sendMessage('Continue.', false);
   };
 
+  const handleEditAndResubmit = (userMessageIndex: number, newContent: string) => {
+    editAndResubmit(userMessageIndex, newContent);
+  };
+
   return (
-    <div className="flex-1 flex flex-col h-full">
+    <div className="flex-1 flex flex-col h-full relative overflow-hidden">
       {/* Chat header with actions - Phase 2B: Enhanced with mode indicator */}
       {currentConversation && currentConversation.messages.length > 0 && (
         <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-3 py-2">
@@ -227,6 +230,11 @@ export const ChatContainer: React.FC = () => {
                     ? handleContinue
                     : undefined
                 }
+                onEdit={
+                  message.role === 'user'
+                    ? (newContent) => handleEditAndResubmit(index, newContent)
+                    : undefined
+                }
               />
             ))
           )}
@@ -234,6 +242,12 @@ export const ChatContainer: React.FC = () => {
           <div ref={messagesEndRef} />
         </div>
       </div>
+
+      <DocDrawerTrigger
+        documents={uploadedDocuments}
+        onOpen={() => setIsDocDrawerOpen(true)}
+        onRemove={removeDocument}
+      />
 
       {/* Input area */}
       <ChatInput 
@@ -246,6 +260,14 @@ export const ChatContainer: React.FC = () => {
         isStreaming={isStreaming}
         isSearching={isSearching}
         webSearchEnabled={settings.webSearchEnabled}
+      />
+
+      <DocDrawer
+        open={isDocDrawerOpen}
+        onClose={() => setIsDocDrawerOpen(false)}
+        documents={uploadedDocuments}
+        onRemove={removeDocument}
+        onUpload={uploadDocument}
       />
     </div>
   );

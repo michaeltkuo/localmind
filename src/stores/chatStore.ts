@@ -53,7 +53,13 @@ interface ChatStore {
   initializeApp: () => Promise<void>;
   getModelStatus: () => 'offline' | 'loading' | 'ready';
   createNewConversation: () => void;
-  sendMessage: (content: string, forceSearch?: boolean) => Promise<void>; // Phase 2B: forceSearch param
+  sendMessage: (
+    content: string,
+    forceSearch?: boolean,
+    metadata?: { parentMessageId?: string; editedFrom?: string }
+  ) => Promise<void>; // Phase 2B: forceSearch param
+  regenerateAt: (assistantMessageIndex: number) => Promise<void>;
+  editAndResubmit: (userMessageIndex: number, newContent: string) => Promise<void>;
   stopStreaming: () => void;
   loadConversation: (id: string) => Promise<void>;
   deleteConversation: (id: string) => Promise<void>;
@@ -228,7 +234,11 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   },
 
   // Send a message
-  sendMessage: async (content: string, forceSearch = false) => { // Phase 2B: forceSearch param
+  sendMessage: async (
+    content: string,
+    forceSearch = false,
+    metadata?: { parentMessageId?: string; editedFrom?: string }
+  ) => { // Phase 2B: forceSearch param
     const { currentConversation, selectedModel, settings, modelLoaded } = get();
     
     // Phase 3B: Start debug logging
@@ -355,6 +365,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       role: 'user',
       content,
       timestamp: Date.now(),
+      editedFrom: metadata?.editedFrom,
       attachments: get()
         .uploadedDocuments
         .filter((doc) =>
@@ -375,6 +386,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       content: '',
       timestamp: Date.now(),
       status: 'thinking',
+      parentMessageId: metadata?.parentMessageId,
+      toolEvents: [{ type: 'thinking', label: 'Thinking', startedAt: Date.now() }],
     };
 
     // Update conversation with user message and assistant placeholder
@@ -434,6 +447,57 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         nextState.currentConversation = updated;
       }
       set(nextState);
+    };
+
+    const appendToolEvent = (conversationId: string, messageId: string, event: NonNullable<Message['toolEvents']>[number]) => {
+      updateConversationById(conversationId, (conv) => {
+        const messages = conv.messages.map((message) => {
+          if (message.id !== messageId) {
+            return message;
+          }
+
+          return {
+            ...message,
+            toolEvents: [...(message.toolEvents || []), event],
+          };
+        });
+
+        return {
+          ...conv,
+          messages,
+          updatedAt: Date.now(),
+        };
+      });
+    };
+
+    const closeLastToolEvent = (conversationId: string, messageId: string) => {
+      updateConversationById(conversationId, (conv) => {
+        const messages = conv.messages.map((message) => {
+          if (message.id !== messageId || !message.toolEvents?.length) {
+            return message;
+          }
+
+          const nextEvents = [...message.toolEvents];
+          const lastEvent = nextEvents[nextEvents.length - 1];
+          if (!lastEvent.endedAt) {
+            nextEvents[nextEvents.length - 1] = {
+              ...lastEvent,
+              endedAt: Date.now(),
+            };
+          }
+
+          return {
+            ...message,
+            toolEvents: nextEvents,
+          };
+        });
+
+        return {
+          ...conv,
+          messages,
+          updatedAt: Date.now(),
+        };
+      });
     };
 
     // Save conversation
@@ -529,6 +593,15 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           apiMessages,
           5, // max iterations
           (toolName, args) => {
+            const toolStartedAt = Date.now();
+            closeLastToolEvent(activeConversationId, assistantMessage.id);
+            appendToolEvent(activeConversationId, assistantMessage.id, {
+              type: 'tool_call',
+              label: `Calling ${toolName}`,
+              startedAt: toolStartedAt,
+              endedAt: toolStartedAt,
+            });
+
             // Inject maxSearchResults into web_search args if not specified
             if (toolName === 'web_search' && !args.max_results && settings.maxSearchResults) {
               args.max_results = settings.maxSearchResults;
@@ -552,9 +625,29 @@ export const useChatStore = create<ChatStore>((set, get) => ({
               }
               return { ...conv, messages };
             });
+
+            if (toolName === 'web_search' && args.query) {
+              appendToolEvent(activeConversationId, assistantMessage.id, {
+                type: 'search',
+                label: 'Searching web',
+                detail: String(args.query),
+                startedAt: Date.now(),
+              });
+            }
           },
           (toolResult) => {
             console.log('[ChatStore] Tool result:', toolResult);
+            closeLastToolEvent(activeConversationId, assistantMessage.id);
+
+            appendToolEvent(activeConversationId, assistantMessage.id, {
+              type: 'tool_result',
+              label: toolResult.success ? 'Received tool result' : 'Tool error',
+              detail: toolResult.success
+                ? (toolResult.data?.results ? `${toolResult.data.results.length} results` : undefined)
+                : toolResult.error,
+              startedAt: Date.now(),
+              endedAt: Date.now(),
+            });
             
             // Phase 3B: Log search results or error
             if (settings.debugMode && logId) {
@@ -596,6 +689,14 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           const messages = [...conv.messages];
           const last = messages[messages.length - 1];
           if (last && last.role === 'assistant') {
+            if (last.toolEvents?.length) {
+              const nextEvents = [...last.toolEvents];
+              const lastEvent = nextEvents[nextEvents.length - 1];
+              if (lastEvent && !lastEvent.endedAt) {
+                nextEvents[nextEvents.length - 1] = { ...lastEvent, endedAt: Date.now() };
+              }
+              last.toolEvents = nextEvents;
+            }
             last.content = result.content;
             last.status = undefined;
           }
@@ -699,7 +800,20 @@ export const useChatStore = create<ChatStore>((set, get) => ({
               updateStreamingConversation(conv => {
                 const messages = [...conv.messages];
                 const last = messages[messages.length - 1];
-                if (last?.role === 'assistant') last.status = undefined;
+                if (last?.role === 'assistant') {
+                  if (last.toolEvents?.length) {
+                    const nextEvents = [...last.toolEvents];
+                    const lastEvent = nextEvents[nextEvents.length - 1];
+                    if (lastEvent && !lastEvent.endedAt) {
+                      nextEvents[nextEvents.length - 1] = {
+                        ...lastEvent,
+                        endedAt: Date.now(),
+                      };
+                    }
+                    last.toolEvents = nextEvents;
+                  }
+                  last.status = undefined;
+                }
                 return { ...conv, messages };
               });
             }
@@ -724,7 +838,20 @@ export const useChatStore = create<ChatStore>((set, get) => ({
             if (finalConv) {
               const messages = [...finalConv.messages];
               const last = messages[messages.length - 1];
-              if (last && last.role === 'assistant') last.status = undefined;
+              if (last && last.role === 'assistant') {
+                if (last.toolEvents?.length) {
+                  const nextEvents = [...last.toolEvents];
+                  const lastEvent = nextEvents[nextEvents.length - 1];
+                  if (lastEvent && !lastEvent.endedAt) {
+                    nextEvents[nextEvents.length - 1] = {
+                      ...lastEvent,
+                      endedAt: Date.now(),
+                    };
+                  }
+                  last.toolEvents = nextEvents;
+                }
+                last.status = undefined;
+              }
               const updatedConv = { ...finalConv, messages };
               StorageService.saveConversation(updatedConv);
 
@@ -744,6 +871,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
             }
           },
           (error: string) => {
+            closeLastToolEvent(streamingConversationId, assistantMessage.id);
             set({ 
               error: `Error: ${error}`,
               isStreaming: false,
@@ -759,6 +887,97 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         isStreaming: false,
       });
     }
+  },
+
+  regenerateAt: async (assistantMessageIndex: number) => {
+    const state = get();
+    const { currentConversation, isStreaming } = state;
+    if (!currentConversation || isStreaming) {
+      return;
+    }
+
+    const messages = currentConversation.messages;
+    if (
+      assistantMessageIndex < 0 ||
+      assistantMessageIndex >= messages.length ||
+      messages[assistantMessageIndex].role !== 'assistant'
+    ) {
+      return;
+    }
+
+    let userMessageIndex = -1;
+    for (let index = assistantMessageIndex - 1; index >= 0; index -= 1) {
+      if (messages[index].role === 'user') {
+        userMessageIndex = index;
+        break;
+      }
+    }
+
+    if (userMessageIndex < 0) {
+      return;
+    }
+
+    const userMessage = messages[userMessageIndex];
+    const staleAssistant = messages[assistantMessageIndex];
+    const trimmedConversation: Conversation = {
+      ...currentConversation,
+      messages: messages.slice(0, userMessageIndex + 1),
+      updatedAt: Date.now(),
+    };
+
+    const conversations = state.conversations.map((conversation) =>
+      conversation.id === trimmedConversation.id ? trimmedConversation : conversation
+    );
+
+    set({
+      currentConversation: trimmedConversation,
+      conversations,
+    });
+    StorageService.saveConversation(trimmedConversation);
+
+    await get().sendMessage(userMessage.content, false, {
+      parentMessageId: staleAssistant.id,
+    });
+  },
+
+  editAndResubmit: async (userMessageIndex: number, newContent: string) => {
+    const state = get();
+    const { currentConversation, isStreaming } = state;
+    const normalizedContent = newContent.trim();
+
+    if (!currentConversation || isStreaming || !normalizedContent) {
+      return;
+    }
+
+    const messages = currentConversation.messages;
+    if (
+      userMessageIndex < 0 ||
+      userMessageIndex >= messages.length ||
+      messages[userMessageIndex].role !== 'user'
+    ) {
+      return;
+    }
+
+    const originalUserMessage = messages[userMessageIndex];
+    const trimmedConversation: Conversation = {
+      ...currentConversation,
+      messages: messages.slice(0, userMessageIndex),
+      updatedAt: Date.now(),
+    };
+
+    const conversations = state.conversations.map((conversation) =>
+      conversation.id === trimmedConversation.id ? trimmedConversation : conversation
+    );
+
+    set({
+      currentConversation: trimmedConversation,
+      conversations,
+    });
+    StorageService.saveConversation(trimmedConversation);
+
+    await get().sendMessage(normalizedContent, false, {
+      editedFrom: originalUserMessage.content,
+    });
   },
 
   // Load a conversation
