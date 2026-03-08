@@ -14,6 +14,12 @@ interface ChatInputProps {
   webSearchEnabled?: boolean;
   layout?: 'bottom' | 'centered';
   promptTemplates?: PromptTemplate[];
+  contextWindowUsage?: {
+    usedTokens: number;
+    limitTokens: number;
+    percentUsed: number;
+    source: 'estimated' | 'measured';
+  };
   onSavePrompt?: (name: string, content: string) => void;
   onDeletePrompt?: (id: string) => void;
 }
@@ -30,6 +36,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   webSearchEnabled = false, // Phase 2B: Now used for force search button
   layout = 'bottom',
   promptTemplates = [],
+  contextWindowUsage,
   onSavePrompt,
   onDeletePrompt,
 }) => {
@@ -92,6 +99,13 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
     }
   }, [input]);
+
+  const contextPercent = Math.max(0, Math.min(100, Math.round((contextWindowUsage?.percentUsed || 0) * 100)));
+  const contextBarColor = contextPercent >= 85
+    ? 'bg-red-500'
+    : contextPercent >= 65
+      ? 'bg-yellow-500'
+      : 'bg-green-500';
 
   return (
     <form
@@ -259,6 +273,20 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             </button>
           </div>
         </div>
+
+        {contextWindowUsage && (
+          <div
+            className="px-1"
+            title={`Context usage: ${contextWindowUsage.usedTokens.toLocaleString()} / ${contextWindowUsage.limitTokens.toLocaleString()} tokens (${contextPercent}%, ${contextWindowUsage.source})`}
+          >
+            <div className="h-1 w-full rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
+              <div
+                className={`h-full ${contextBarColor} transition-all duration-200`}
+                style={{ width: `${contextPercent}%` }}
+              />
+            </div>
+          </div>
+        )}
       </div>
     </form>
   );

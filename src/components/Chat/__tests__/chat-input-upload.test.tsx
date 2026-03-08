@@ -60,4 +60,25 @@ describe('ChatInput upload behavior', () => {
 
     expect(html).toContain('Prompts');
   });
+
+  test('renders context window indicator when usage is provided', () => {
+    const html = renderToStaticMarkup(
+      <ChatInput
+        onSendMessage={() => {}}
+        onUploadDocument={() => {}}
+        disabled={false}
+        isStreaming={false}
+        isSearching={false}
+        webSearchEnabled={false}
+        contextWindowUsage={{
+          usedTokens: 1200,
+          limitTokens: 4096,
+          percentUsed: 1200 / 4096,
+          source: 'measured',
+        }}
+      />
+    );
+
+    expect(html).toContain('Context usage: 1,200 / 4,096 tokens');
+  });
 });

@@ -1,7 +1,7 @@
 // Chat store using Zustand for state management
 import { create } from 'zustand';
 import type { Conversation, Message, ChatSettings, OllamaModel, UploadedDocument, DocumentChunk, PromptTemplate } from '../types';
-import { OllamaService } from '../services/ollama.service';
+import { OllamaService, type OllamaChatMetrics } from '../services/ollama.service';
 import { StorageService } from '../services/storage.service';
 import { DocumentStorageService, DOCUMENT_TTL_MS } from '../services/document-storage.service';
 import { DocumentService } from '../services/document.service';
@@ -95,6 +95,12 @@ interface ChatStore {
   indexingConversationId: string | null;
   pendingAttachmentIdsByConversation: Record<string, string[]>;
   promptTemplates: PromptTemplate[];
+  contextWindowUsage: {
+    usedTokens: number;
+    limitTokens: number;
+    percentUsed: number;
+    source: 'estimated' | 'measured';
+  };
 
   // Actions
   initializeApp: () => Promise<void>;
@@ -148,6 +154,21 @@ const DEFAULT_SETTINGS: ChatSettings = {
   ragMaxContextTokens: 8000,
 };
 
+const buildContextWindowUsage = (
+  modelName: string,
+  usedTokens: number,
+  source: 'estimated' | 'measured'
+) => {
+  const limitTokens = Math.max(1, getContextLimit(modelName));
+  const safeUsed = Math.max(0, Math.min(usedTokens, limitTokens));
+  return {
+    usedTokens: safeUsed,
+    limitTokens,
+    percentUsed: safeUsed / limitTokens,
+    source,
+  };
+};
+
 export const useChatStore = create<ChatStore>((set, get) => ({
   // Initial state
   currentConversation: null,
@@ -176,6 +197,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   indexingConversationId: null,
   pendingAttachmentIdsByConversation: {},
   promptTemplates: DEFAULT_PROMPT_TEMPLATES,
+  contextWindowUsage: buildContextWindowUsage('llama3.2:latest', 0, 'estimated'),
 
   // Get current model status
   getModelStatus: () => {
@@ -478,6 +500,14 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       updatedAt: Date.now(),
       title: conversation.messages.length === 0 ? content.slice(0, 50) : conversation.title,
     };
+    const estimatedConversationTokens = estimateTokenCount(
+      updatedMessages.map((message) => message.content).join('\n')
+    );
+    const estimatedContextWindowUsage = buildContextWindowUsage(
+      selectedModel,
+      estimatedConversationTokens,
+      'estimated'
+    );
 
     // Whether this is the first user message — used after streaming to trigger
     // background LLM title generation.
@@ -501,12 +531,31 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       conversations: updatedConversationList,
       isStreaming: true,
       error: null,
+      contextWindowUsage: estimatedContextWindowUsage,
       pendingAttachmentIdsByConversation: {
         ...get().pendingAttachmentIdsByConversation,
         [activeConversationId]: [],
       },
       ...(isThisConvPill ? { indexingFileName: null, indexingConversationId: null } : {}),
     });
+
+    const applyContextUsageFromMetrics = (metrics?: OllamaChatMetrics, finalAssistantContent: string = '') => {
+      const promptTokens = typeof metrics?.promptEvalCount === 'number'
+        ? metrics.promptEvalCount
+        : estimatedConversationTokens;
+      const completionTokens = typeof metrics?.evalCount === 'number'
+        ? metrics.evalCount
+        : estimateTokenCount(finalAssistantContent);
+      const usedTokens = promptTokens + completionTokens;
+      const source: 'estimated' | 'measured' =
+        typeof metrics?.promptEvalCount === 'number' || typeof metrics?.evalCount === 'number'
+          ? 'measured'
+          : 'estimated';
+
+      set({
+        contextWindowUsage: buildContextWindowUsage(selectedModel, usedTokens, source),
+      });
+    };
 
     const updateConversationById = (
       conversationId: string,
@@ -787,6 +836,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         set({ isStreaming: false, abortController: null });
 
         if (updatedConv) {
+          applyContextUsageFromMetrics(result.metrics, result.content);
+
           if (settings.debugMode && logId) {
             const responseDuration = Date.now() - startTime;
             const tokenCount = estimateTokenCount(result.content);
@@ -836,6 +887,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         };
 
         let streamStarted = false;
+        let streamMetrics: OllamaChatMetrics | undefined;
         // rAF batching: buffer incoming tokens and flush to state at ~60fps
         // instead of calling set() on every single token (which would cause
         // a full React re-render for each one).
@@ -903,7 +955,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
               rafId = requestAnimationFrame(flushPending);
             }
           },
-          () => {
+          (metrics) => {
+            streamMetrics = metrics;
             // Flush any tokens that arrived since the last rAF tick
             if (rafId !== null) {
               cancelAnimationFrame(rafId);
@@ -933,6 +986,15 @@ export const useChatStore = create<ChatStore>((set, get) => ({
                 last.status = undefined;
               }
               const updatedConv = { ...finalConv, messages };
+              let finalAssistantContent = '';
+              for (let index = updatedConv.messages.length - 1; index >= 0; index -= 1) {
+                const message = updatedConv.messages[index];
+                if (message.role === 'assistant') {
+                  finalAssistantContent = message.content;
+                  break;
+                }
+              }
+              applyContextUsageFromMetrics(streamMetrics, finalAssistantContent);
               StorageService.saveConversation(updatedConv);
 
               // Background title generation for first message
@@ -1254,7 +1316,12 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       const { selectedModel } = get();
       const modelStillExists = models.some((model) => model.name === selectedModel);
       if (!modelStillExists && models.length > 0) {
-        set({ selectedModel: models[0].name, modelLoaded: false });
+        const currentUsage = get().contextWindowUsage;
+        set({
+          selectedModel: models[0].name,
+          modelLoaded: false,
+          contextWindowUsage: buildContextWindowUsage(models[0].name, currentUsage.usedTokens, currentUsage.source),
+        });
       }
     } catch (error) {
       console.error('Error refreshing models:', error);
@@ -1264,7 +1331,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
   // Set selected model
   setSelectedModel: async (model: string) => {
-    const { settings } = get();
+    const { settings, contextWindowUsage } = get();
     
     // Check if model supports tools
     const modelSupportsTools = supportsTools(model);
@@ -1287,6 +1354,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       showLoadingOverlay: true,
       loadingOverlayMessage: 'Switching model...',
       error: null, // Clear any previous errors
+      contextWindowUsage: buildContextWindowUsage(model, contextWindowUsage.usedTokens, contextWindowUsage.source),
     });
 
     // Warm up the new model

@@ -28,6 +28,7 @@ export const ChatContainer: React.FC = () => {
     isSearching,
     settings,
     promptTemplates,
+    contextWindowUsage,
     addPromptTemplate,
     deletePromptTemplate,
   } = useChatStore();
@@ -84,6 +85,7 @@ export const ChatContainer: React.FC = () => {
               isSearching={isSearching}
               webSearchEnabled={settings.webSearchEnabled}
               promptTemplates={promptTemplates}
+              contextWindowUsage={contextWindowUsage}
               onSavePrompt={addPromptTemplate}
               onDeletePrompt={deletePromptTemplate}
               layout="centered"
@@ -143,6 +145,7 @@ export const ChatContainer: React.FC = () => {
               isSearching={isSearching}
               webSearchEnabled={settings.webSearchEnabled}
               promptTemplates={promptTemplates}
+              contextWindowUsage={contextWindowUsage}
               onSavePrompt={addPromptTemplate}
               onDeletePrompt={deletePromptTemplate}
               layout="centered"
@@ -276,6 +279,7 @@ export const ChatContainer: React.FC = () => {
         isSearching={isSearching}
         webSearchEnabled={settings.webSearchEnabled}
         promptTemplates={promptTemplates}
+        contextWindowUsage={contextWindowUsage}
         onSavePrompt={addPromptTemplate}
         onDeletePrompt={deletePromptTemplate}
         layout="bottom"

@@ -17,11 +17,19 @@ interface OllamaChatResponse {
   created_at: string;
   message: OllamaMessage;
   done: boolean;
+  context?: number[];
   total_duration?: number;
   load_duration?: number;
   prompt_eval_count?: number;
   eval_count?: number;
   eval_duration?: number;
+}
+
+export interface OllamaChatMetrics {
+  promptEvalCount?: number;
+  evalCount?: number;
+  totalDuration?: number;
+  contextLength?: number;
 }
 
 interface OllamaEmbedResponse {
@@ -79,7 +87,7 @@ export class OllamaService {
     messages: Message[],
     signal: AbortSignal,
     onChunk: (chunk: string) => void,
-    onComplete: () => void,
+    onComplete: (metrics?: OllamaChatMetrics) => void,
     onError: (error: string) => void,
     tools?: ToolDefinition[]
   ): Promise<void> {
@@ -145,7 +153,12 @@ export class OllamaService {
               onChunk(json.message.content);
             }
             if (json.done) {
-              onComplete();
+              onComplete({
+                promptEvalCount: json.prompt_eval_count,
+                evalCount: json.eval_count,
+                totalDuration: json.total_duration,
+                contextLength: Array.isArray(json.context) ? json.context.length : undefined,
+              });
               return;
             }
           } catch (e) {
@@ -238,7 +251,7 @@ export class OllamaService {
     onToolCall?: (toolName: string, args: any) => void,
     onToolResult?: (result: any) => void,
     signal?: AbortSignal
-  ): Promise<{ content: string; iterations: number; toolCalls: number }> {
+  ): Promise<{ content: string; iterations: number; toolCalls: number; metrics?: OllamaChatMetrics }> {
     const tools = toolRegistry.getToolDefinitions();
     let iterations = 0;
     let toolCallCount = 0;
@@ -336,6 +349,12 @@ export class OllamaService {
         content: response.message.content,
         iterations,
         toolCalls: toolCallCount,
+        metrics: {
+          promptEvalCount: response.prompt_eval_count,
+          evalCount: response.eval_count,
+          totalDuration: response.total_duration,
+          contextLength: Array.isArray(response.context) ? response.context.length : undefined,
+        },
       };
     }
 
