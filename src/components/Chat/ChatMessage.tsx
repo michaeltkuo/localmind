@@ -1,10 +1,12 @@
-import { Children, Fragment, useMemo, useState } from 'react';
+import { Children, Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import type { Message } from '../../types';
 import { CitationPill } from './CitationPill';
+import { MessageActionBar } from './MessageActionBar';
+import { ToolTimeline } from './ToolTimeline';
 
 interface ChatMessageProps {
   message: Message;
@@ -16,6 +18,7 @@ interface ChatMessageProps {
   isLatestAssistant?: boolean;
   onRegenerate?: () => void;
   onContinue?: () => void;
+  onEdit?: (newContent: string) => void;
 }
 
 export const ChatMessage: React.FC<ChatMessageProps> = ({
@@ -24,11 +27,30 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   isLatestAssistant = false,
   onRegenerate,
   onContinue,
+  onEdit,
 }) => {
   const isUser = message.role === 'user';
   const [copied, setCopied] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editText, setEditText] = useState(message.content);
+  const editTextAreaRef = useRef<HTMLTextAreaElement>(null);
   // Track which sources are actually cited inline to show a summary later
   const usedUrls = new Set<string>();
+
+  useEffect(() => {
+    setEditText(message.content);
+    setIsEditing(false);
+  }, [message.id, message.content]);
+
+  useEffect(() => {
+    if (!isEditing || !editTextAreaRef.current) {
+      return;
+    }
+
+    const textarea = editTextAreaRef.current;
+    textarea.style.height = 'auto';
+    textarea.style.height = `${textarea.scrollHeight}px`;
+  }, [isEditing, editText]);
 
   // Preprocess content to remove References/Sources sections and track citations
   const processedContent = useMemo(() => {
@@ -72,6 +94,18 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
     }
   };
 
+  const handleEditSubmit = () => {
+    const normalizedContent = editText.trim();
+    if (!normalizedContent || normalizedContent === message.content) {
+      setIsEditing(false);
+      setEditText(message.content);
+      return;
+    }
+
+    onEdit?.(normalizedContent);
+    setIsEditing(false);
+  };
+
   return (
     <div className={`flex w-full ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
       <div className={`max-w-[80%] ${isUser ? 'order-2' : 'order-1'}`}>
@@ -83,7 +117,11 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
                 className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-4 py-3"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-red-500 flex items-center justify-center text-lg">📄</div>
+                  <div className="w-10 h-10 rounded-xl bg-red-500 flex items-center justify-center text-white">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 3h7l5 5v13a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1z" />
+                    </svg>
+                  </div>
                   <div className="min-w-0">
                     <div className="text-sm font-semibold truncate">{attachment.name}</div>
                     <div className="text-xs text-gray-500 dark:text-gray-300 uppercase">
@@ -104,7 +142,44 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
             }`}
           >
             {isUser ? (
-              <p className="whitespace-pre-wrap break-words">{message.content}</p>
+              isEditing ? (
+                <div className="space-y-2">
+                  <textarea
+                    ref={editTextAreaRef}
+                    value={editText}
+                    onChange={(event) => setEditText(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Escape') {
+                        event.preventDefault();
+                        setIsEditing(false);
+                        setEditText(message.content);
+                      }
+                    }}
+                    className="w-full rounded-md border border-blue-300 bg-white text-gray-900 px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 resize-none"
+                    rows={3}
+                    aria-label="Edit message"
+                  />
+                  <div className="flex items-center justify-end gap-2 text-xs">
+                    <button
+                      onClick={() => {
+                        setIsEditing(false);
+                        setEditText(message.content);
+                      }}
+                      className="px-2 py-1 rounded border border-blue-200 text-blue-100 hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleEditSubmit}
+                      className="px-2 py-1 rounded border border-blue-200 text-blue-100 hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200"
+                    >
+                      Submit
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <p className="whitespace-pre-wrap break-words">{message.content}</p>
+              )
             ) : (
               <>
                 {/* Status bubble states - Phase 2B: Enhanced animations */}
@@ -112,9 +187,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
                   <div className="space-y-2">
                     {/* Main indicator */}
                     <div className="flex items-center gap-3 text-blue-600 dark:text-blue-400">
-                      <span className="inline-flex items-center justify-center w-6 h-6 animate-spin-slow">
-                        🔎
-                      </span>
+                      <span className="inline-flex items-center justify-center w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
                       <div className="flex flex-col">
                         <span className="font-semibold">Searching the web</span>
                         {message.lastSearchQuery && (
@@ -134,9 +207,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
                 {message.status === 'thinking' && (
                   <div className="space-y-2">
                     <div className="flex items-center gap-3 text-purple-600 dark:text-purple-400">
-                      <span className="inline-flex items-center justify-center w-6 h-6 animate-pulse">
-                        💭
-                      </span>
+                      <span className="inline-flex items-center justify-center w-2 h-2 rounded-full bg-purple-500 animate-pulse" />
                       <span className="font-semibold">Thinking</span>
                     </div>
                     
@@ -145,6 +216,13 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
                       <div className="h-full bg-gradient-to-r from-purple-500 to-pink-500 animate-progress-bar" />
                     </div>
                   </div>
+                )}
+
+                {message.toolEvents && message.toolEvents.length > 0 && !message.status && (
+                  <ToolTimeline
+                    events={message.toolEvents}
+                    isStreaming={isActivelyStreaming}
+                  />
                 )}
 
                 <div className={`prose prose-sm dark:prose-invert max-w-none prose-pre:p-0 prose-pre:m-0 ${message.status ? 'hidden' : ''}`}>
@@ -304,56 +382,34 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
 
                 {/* Message action bar */}
                 {!message.status && (
-                  <div className="mt-2 flex items-center gap-2 text-xs">
-                    <button
-                      onClick={handleCopy}
-                      className="px-2 py-1 rounded border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700 transition-colors"
-                    >
-                      {copied ? 'Copied' : 'Copy'}
-                    </button>
-                    {isLatestAssistant && onRegenerate && (
-                      <button
-                        onClick={onRegenerate}
-                        className="px-2 py-1 rounded border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700 transition-colors"
-                      >
-                        Regenerate
-                      </button>
-                    )}
-                    {isLatestAssistant && onContinue && (
-                      <button
-                        onClick={onContinue}
-                        className="px-2 py-1 rounded border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700 transition-colors"
-                      >
-                        Continue
-                      </button>
-                    )}
-                  </div>
+                  <MessageActionBar
+                    isUser={false}
+                    isStreaming={isActivelyStreaming}
+                    copied={copied}
+                    canRegenerate={Boolean(onRegenerate)}
+                    canContinue={Boolean(onContinue && isLatestAssistant)}
+                    canEdit={false}
+                    onCopy={handleCopy}
+                    onRegenerate={onRegenerate}
+                    onContinue={isLatestAssistant ? onContinue : undefined}
+                  />
                 )}
               </>
             )}
           </div>
-
-          {/* Copy button */}
-          <button
-            onClick={handleCopy}
-            className={`absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded ${
-              isUser 
-                ? 'bg-blue-700 hover:bg-blue-800 text-white' 
-                : 'bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600'
-            }`}
-            title="Copy message"
-          >
-            {copied ? (
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-            ) : (
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-              </svg>
-            )}
-          </button>
         </div>
+        {!message.status && isUser && !isEditing && (
+          <MessageActionBar
+            isUser={true}
+            isStreaming={isActivelyStreaming}
+            copied={copied}
+            canRegenerate={false}
+            canContinue={false}
+            canEdit={Boolean(onEdit)}
+            onCopy={handleCopy}
+            onStartEdit={() => setIsEditing(true)}
+          />
+        )}
         <div className={`text-xs text-gray-500 mt-1 ${isUser ? 'text-right' : 'text-left'}`}>
           {new Date(message.timestamp).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
         </div>

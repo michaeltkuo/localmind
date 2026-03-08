@@ -23,6 +23,14 @@ export interface ToolResultMessage {
   name?: string; // Tool name for context
 }
 
+export interface ToolEvent {
+  type: 'thinking' | 'search' | 'tool_call' | 'tool_result';
+  label: string;
+  startedAt: number;
+  endedAt?: number;
+  detail?: string;
+}
+
 export interface Message {
   id: string;
   role: 'user' | 'assistant' | 'system' | 'tool';
@@ -36,6 +44,9 @@ export interface Message {
   // UI status for assistant placeholder: searching/ thinking while awaiting content
   status?: 'searching' | 'thinking' | 'typing';
   lastSearchQuery?: string; // Phase 2B: Track what was searched for better UX
+  toolEvents?: ToolEvent[];
+  parentMessageId?: string;
+  editedFrom?: string;
 }
 
 export interface SearchResult {

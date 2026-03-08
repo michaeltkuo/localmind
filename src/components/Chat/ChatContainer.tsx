@@ -1,14 +1,19 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
 import { useChatStore } from '../../stores/chatStore';
-import { supportsTools } from '../../constants/models';
+import { DocDrawerTrigger } from '../Documents/DocDrawerTrigger';
+import { DocDrawer } from '../Documents/DocDrawer';
 
 export const ChatContainer: React.FC = () => {
   const { 
     currentConversation, 
     sendMessage, 
+    regenerateAt,
+    editAndResubmit,
     uploadDocument,
+    removeDocument,
+    uploadedDocuments,
     isIndexingDocument,
     indexingProgress,
     indexingFileName,
@@ -21,10 +26,10 @@ export const ChatContainer: React.FC = () => {
     stopStreaming,
     isSearching,
     settings,
-    selectedModel, // Phase 2B: Need selectedModel for header display
   } = useChatStore();
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [isDocDrawerOpen, setIsDocDrawerOpen] = useState(false);
 
   // Auto-scroll to bottom when new messages arrive
   // Use instant scroll during streaming for better responsiveness
@@ -62,23 +67,22 @@ export const ChatContainer: React.FC = () => {
 
   if (!currentConversation) {
     return (
-      <div className="flex-1 flex flex-col h-full">
-        <div className="flex-1 flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-          <div className="text-center p-8">
-            <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">Welcome to LocalMind</h2>
-            <p className="text-gray-600 dark:text-gray-300 mb-6">Your private AI assistant. All conversations stay on your computer.</p>
-            <div className="text-6xl mb-4">🧠</div>
+      <div className="flex-1 flex flex-col h-full bg-gray-50 dark:bg-gray-900">
+        <div className="flex-1 flex items-center justify-center px-6">
+          <div className="w-full max-w-3xl text-center space-y-8">
+            <h2 className="text-4xl font-semibold text-gray-900 dark:text-white">Ready when you are.</h2>
+            <ChatInput
+              onSendMessage={handleSendMessage}
+              onUploadDocument={uploadDocument}
+              isIndexingDocument={isIndexingDocument}
+              disabled={!modelLoaded}
+              isStreaming={isStreaming}
+              isSearching={isSearching}
+              webSearchEnabled={settings.webSearchEnabled}
+              layout="centered"
+            />
           </div>
         </div>
-        <ChatInput 
-          onSendMessage={handleSendMessage} 
-          onUploadDocument={uploadDocument}
-          isIndexingDocument={isIndexingDocument}
-          disabled={!modelLoaded}
-          isStreaming={isStreaming}
-          isSearching={isSearching}
-          webSearchEnabled={settings.webSearchEnabled}
-        />
       </div>
     );
   }
@@ -96,15 +100,7 @@ export const ChatContainer: React.FC = () => {
   };
 
   const handleRegenerate = (assistantMessageIndex: number) => {
-    if (!currentConversation || isStreaming) return;
-
-    for (let index = assistantMessageIndex - 1; index >= 0; index -= 1) {
-      const message = currentConversation.messages[index];
-      if (message.role === 'user') {
-        sendMessage(message.content, false);
-        return;
-      }
-    }
+    regenerateAt(assistantMessageIndex);
   };
 
   const handleContinue = () => {
@@ -112,44 +108,51 @@ export const ChatContainer: React.FC = () => {
     sendMessage('Continue.', false);
   };
 
+  const handleEditAndResubmit = (userMessageIndex: number, newContent: string) => {
+    editAndResubmit(userMessageIndex, newContent);
+  };
+
+  if (currentConversation.messages.length === 0) {
+    return (
+      <div className="flex-1 flex flex-col h-full bg-gray-50 dark:bg-gray-900">
+        <div className="flex-1 flex items-center justify-center px-6">
+          <div className="w-full max-w-3xl text-center space-y-8">
+            <p className="text-gray-500 dark:text-gray-400">No messages yet. Start the conversation!</p>
+            <ChatInput
+              onSendMessage={handleSendMessage}
+              onUploadDocument={uploadDocument}
+              isIndexingDocument={isIndexingDocument}
+              indexingFileName={currentConversation.id === indexingConversationId ? indexingFileName : null}
+              indexingProgress={currentConversation.id === indexingConversationId ? indexingProgress : null}
+              disabled={!modelLoaded}
+              isStreaming={isStreaming}
+              isSearching={isSearching}
+              webSearchEnabled={settings.webSearchEnabled}
+              layout="centered"
+            />
+          </div>
+        </div>
+
+        <DocDrawer
+          open={isDocDrawerOpen}
+          onClose={() => setIsDocDrawerOpen(false)}
+          documents={uploadedDocuments}
+          onRemove={removeDocument}
+          onUpload={uploadDocument}
+        />
+      </div>
+    );
+  }
+
   return (
-    <div className="flex-1 flex flex-col h-full">
-      {/* Chat header with actions - Phase 2B: Enhanced with mode indicator */}
+    <div className="flex-1 flex flex-col h-full relative overflow-hidden bg-gray-50 dark:bg-gray-900">
       {currentConversation && currentConversation.messages.length > 0 && (
-        <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-3 py-2">
-          <div className="flex items-center justify-between max-w-full">
-            {/* Left: Model info + capabilities */}
-            <div className="flex items-center gap-3 flex-1 min-w-0">
-              <div className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                {selectedModel}
-              </div>
-              
-              {/* Capability badges */}
-              <div className="flex items-center gap-2 flex-shrink-0">
-                {supportsTools(selectedModel) && (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 text-xs font-medium">
-                    Tools
-                  </span>
-                )}
-                
-                {settings.webSearchEnabled && (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 text-xs font-medium">
-                    Web
-                  </span>
-                )}
-              </div>
-              
-              <div className="text-xs text-gray-500 dark:text-gray-400">
-                {currentConversation.messages.length} message{currentConversation.messages.length !== 1 ? 's' : ''}
-              </div>
-            </div>
-            
-            {/* Right: Actions */}
-          <div className="flex items-center gap-2">
+        <div className="px-4 py-2">
+          <div className="max-w-3xl mx-auto flex items-center justify-end gap-2">
             {/* Export Buttons */}
             <button
               onClick={() => handleExport('json')}
-              className="text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700 px-2.5 py-1 rounded-md transition-colors flex items-center gap-1"
+              className="text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200/60 dark:hover:bg-gray-800 px-2.5 py-1 rounded-md transition-colors flex items-center gap-1"
               title="Export as JSON"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -159,7 +162,7 @@ export const ChatContainer: React.FC = () => {
             </button>
             <button
               onClick={() => handleExport('markdown')}
-              className="text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700 px-2.5 py-1 rounded-md transition-colors flex items-center gap-1"
+              className="text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200/60 dark:hover:bg-gray-800 px-2.5 py-1 rounded-md transition-colors flex items-center gap-1"
               title="Export as Markdown"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -172,7 +175,7 @@ export const ChatContainer: React.FC = () => {
             {isStreaming && (
               <button
                 onClick={stopStreaming}
-                className="text-sm text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-900 px-2.5 py-1 rounded-md transition-colors flex items-center gap-1"
+                className="text-sm text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300 hover:bg-orange-100/60 dark:hover:bg-orange-900/40 px-2.5 py-1 rounded-md transition-colors flex items-center gap-1"
                 title="Stop generation"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -186,7 +189,7 @@ export const ChatContainer: React.FC = () => {
             {/* Clear Button */}
             <button
               onClick={handleClearConversation}
-              className="text-sm text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900 px-2.5 py-1 rounded-md transition-colors flex items-center gap-1"
+              className="text-sm text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-100/60 dark:hover:bg-red-900/40 px-2.5 py-1 rounded-md transition-colors flex items-center gap-1"
               title="Delete conversation"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -195,45 +198,49 @@ export const ChatContainer: React.FC = () => {
               Clear
             </button>
           </div>
-          </div>
         </div>
       )}
 
       {/* Messages area */}
-      <div className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 px-3 py-2">
+      <div className="flex-1 overflow-y-auto px-3 py-2">
         <div className="max-w-3xl mx-auto">
-          {currentConversation.messages.length === 0 ? (
-            <div className="text-center text-gray-500 dark:text-gray-400 mt-8">
-              <p>No messages yet. Start the conversation!</p>
-            </div>
-          ) : (
-            currentConversation.messages.map((message, index) => (
-              <ChatMessage
-                key={message.id}
-                message={message}
-                isActivelyStreaming={
-                  isStreaming && index === currentConversation.messages.length - 1
-                }
-                isLatestAssistant={
-                  message.role === 'assistant' && index === currentConversation.messages.length - 1
-                }
-                onRegenerate={
-                  message.role === 'assistant'
-                    ? () => handleRegenerate(index)
-                    : undefined
-                }
-                onContinue={
-                  message.role === 'assistant' && index === currentConversation.messages.length - 1
-                    ? handleContinue
-                    : undefined
-                }
-              />
-            ))
-          )}
+          {currentConversation.messages.map((message, index) => (
+            <ChatMessage
+              key={message.id}
+              message={message}
+              isActivelyStreaming={
+                isStreaming && index === currentConversation.messages.length - 1
+              }
+              isLatestAssistant={
+                message.role === 'assistant' && index === currentConversation.messages.length - 1
+              }
+              onRegenerate={
+                message.role === 'assistant'
+                  ? () => handleRegenerate(index)
+                  : undefined
+              }
+              onContinue={
+                message.role === 'assistant' && index === currentConversation.messages.length - 1
+                  ? handleContinue
+                  : undefined
+              }
+              onEdit={
+                message.role === 'user'
+                  ? (newContent) => handleEditAndResubmit(index, newContent)
+                  : undefined
+              }
+            />
+          ))}
 
           <div ref={messagesEndRef} />
         </div>
       </div>
+
+      <DocDrawerTrigger
+        documents={uploadedDocuments}
+        onOpen={() => setIsDocDrawerOpen(true)}
+        onRemove={removeDocument}
+      />
 
       {/* Input area */}
       <ChatInput 
@@ -246,6 +253,15 @@ export const ChatContainer: React.FC = () => {
         isStreaming={isStreaming}
         isSearching={isSearching}
         webSearchEnabled={settings.webSearchEnabled}
+        layout="bottom"
+      />
+
+      <DocDrawer
+        open={isDocDrawerOpen}
+        onClose={() => setIsDocDrawerOpen(false)}
+        documents={uploadedDocuments}
+        onRemove={removeDocument}
+        onUpload={uploadDocument}
       />
     </div>
   );
