@@ -1,3 +1,14 @@
+## [1.6.0](https://github.com/michaeltkuo/localmind/compare/v1.5.0...v1.6.0) (2026-03-08)
+
+### ✨ Features
+
+* ChatGPT-style UI polish (centered empty state, clean composer, circular controls, sidebar scrollbar) ([2f1061d](https://github.com/michaeltkuo/localmind/commit/2f1061de7be5ba28951af79ccab05dd29e36df57))
+* P1 message actions, tool timeline, and document drawer ([45663fe](https://github.com/michaeltkuo/localmind/commit/45663fef07959ee859615b66a02c91e712662476))
+
+### 🐛 Bug Fixes
+
+* resolve CI type-check failures in chat/sidebar ([20f40e7](https://github.com/michaeltkuo/localmind/commit/20f40e7a879fcbc20bf1318733d950643be83c6a))
+
 ## [1.5.0](https://github.com/michaeltkuo/localmind/compare/v1.4.0...v1.5.0) (2026-03-07)
 
 ### ✨ Features
