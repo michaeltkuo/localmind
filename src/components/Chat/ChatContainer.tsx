@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
 import { useChatStore } from '../../stores/chatStore';
-import { supportsTools } from '../../constants/models';
 import { DocDrawerTrigger } from '../Documents/DocDrawerTrigger';
 import { DocDrawer } from '../Documents/DocDrawer';
 
@@ -27,7 +26,6 @@ export const ChatContainer: React.FC = () => {
     stopStreaming,
     isSearching,
     settings,
-    selectedModel, // Phase 2B: Need selectedModel for header display
   } = useChatStore();
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
