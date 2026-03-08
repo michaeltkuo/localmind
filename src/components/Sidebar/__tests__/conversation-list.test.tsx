@@ -18,7 +18,8 @@ describe('ConversationList', () => {
 
     expect(html).toContain('Search conversations');
     expect(html).toContain('No conversations yet');
-    expect(html).toContain('New Chat');
+    expect(html).toContain('New chat');
+    expect(html).toContain('Search chats');
     expect(html).toContain('Active');
     expect(html).toContain('Archived');
   });

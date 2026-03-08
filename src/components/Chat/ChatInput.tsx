@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { DocumentUploadButton } from '../Documents/DocumentUploadButton';
+import type { PromptTemplate } from '../../types';
 
 interface ChatInputProps {
   onSendMessage: (message: string, forceSearch?: boolean) => void; // Phase 2B: forceSearch param
@@ -12,6 +13,9 @@ interface ChatInputProps {
   isSearching?: boolean;
   webSearchEnabled?: boolean;
   layout?: 'bottom' | 'centered';
+  promptTemplates?: PromptTemplate[];
+  onSavePrompt?: (name: string, content: string) => void;
+  onDeletePrompt?: (id: string) => void;
 }
 
 export const ChatInput: React.FC<ChatInputProps> = ({ 
@@ -25,8 +29,13 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   isSearching = false,
   webSearchEnabled = false, // Phase 2B: Now used for force search button
   layout = 'bottom',
+  promptTemplates = [],
+  onSavePrompt,
+  onDeletePrompt,
 }) => {
   const [input, setInput] = useState('');
+  const [showPromptLibrary, setShowPromptLibrary] = useState(false);
+  const [newPromptName, setNewPromptName] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const handleSubmit = (e: React.FormEvent, forceSearch = false) => {
@@ -48,6 +57,25 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         textareaRef.current.style.height = 'auto';
       }
     }
+  };
+
+  const handleSavePrompt = () => {
+    const promptContent = input.trim();
+    if (!promptContent || !onSavePrompt) {
+      return;
+    }
+
+    const promptName = newPromptName.trim() || promptContent.split(/\s+/).slice(0, 5).join(' ');
+    onSavePrompt(promptName, promptContent);
+    setNewPromptName('');
+  };
+
+  const handleInsertPrompt = (promptContent: string) => {
+    setInput(promptContent);
+    setShowPromptLibrary(false);
+    window.setTimeout(() => {
+      textareaRef.current?.focus();
+    }, 0);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -106,7 +134,71 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         )}
 
         {/* Main input row */}
-        <div className="flex items-end rounded-3xl bg-gray-100 dark:bg-gray-800 px-3 py-2 transition-colors">
+        <div className="relative flex items-end rounded-3xl bg-gray-100 dark:bg-gray-800 px-3 py-2 transition-colors">
+          {showPromptLibrary && (
+            <div className="absolute bottom-full right-0 mb-2 w-80 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-xl p-3 z-20">
+              <div className="mb-2 flex items-center justify-between">
+                <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Prompt library</h4>
+                <button
+                  type="button"
+                  onClick={() => setShowPromptLibrary(false)}
+                  className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+                >
+                  Close
+                </button>
+              </div>
+
+              <div className="space-y-2 mb-3 max-h-52 overflow-y-auto pr-1">
+                {promptTemplates.length === 0 ? (
+                  <p className="text-xs text-gray-500 dark:text-gray-400">No prompts saved yet.</p>
+                ) : (
+                  promptTemplates.map((prompt) => (
+                    <div key={prompt.id} className="rounded-xl border border-gray-200 dark:border-gray-700 p-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleInsertPrompt(prompt.content)}
+                          className="text-left flex-1"
+                        >
+                          <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{prompt.name}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 mt-0.5">{prompt.content}</p>
+                        </button>
+                        {!prompt.builtIn && onDeletePrompt && (
+                          <button
+                            type="button"
+                            onClick={() => onDeletePrompt(prompt.id)}
+                            className="text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
+                            title="Delete prompt"
+                          >
+                            Delete
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div className="space-y-2 border-t border-gray-200 dark:border-gray-700 pt-2">
+                <input
+                  type="text"
+                  value={newPromptName}
+                  onChange={(e) => setNewPromptName(e.target.value)}
+                  placeholder="Prompt name (optional)"
+                  className="w-full px-2.5 py-2 text-xs rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                />
+                <button
+                  type="button"
+                  onClick={handleSavePrompt}
+                  disabled={!input.trim() || !onSavePrompt}
+                  className="w-full px-2.5 py-2 text-xs rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+                >
+                  Save current input as prompt
+                </button>
+              </div>
+            </div>
+          )}
+
           <DocumentUploadButton
             onUpload={onUploadDocument}
             disabled={disabled || isIndexingDocument}
@@ -127,6 +219,17 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
           {/* Button group */}
           <div className="self-end flex items-center gap-2 pb-0.5">
+            {promptTemplates.length > 0 && !isStreaming && !isSearching && (
+              <button
+                type="button"
+                onClick={() => setShowPromptLibrary((value) => !value)}
+                className="h-8 px-3 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 text-sm font-medium hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                title="Prompt library"
+              >
+                Prompts
+              </button>
+            )}
+
             {/* Force search button - only show if web search enabled */}
             {webSearchEnabled && !isStreaming && !isSearching && input.trim() && (
               <button

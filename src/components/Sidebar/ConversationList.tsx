@@ -29,6 +29,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
   const [renameTitle, setRenameTitle] = useState('');
   const [showArchived, setShowArchived] = useState(false);
   const [openActionsConversationId, setOpenActionsConversationId] = useState<string | null>(null);
+  const [showSearchInput, setShowSearchInput] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const getConversationPreview = (conversation: Conversation): string => {
@@ -40,6 +41,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
       return;
     }
 
+    setShowSearchInput(true);
     searchInputRef.current?.focus();
     searchInputRef.current?.select();
   }, [searchFocusToken]);
@@ -147,16 +149,84 @@ export const ConversationList: React.FC<ConversationListProps> = ({
 
   return (
     <div className="flex flex-col bg-gray-50 dark:bg-gray-800">
-      <div className="p-3">
+      <div className="px-3 pt-3 pb-2 space-y-1">
         <button
           onClick={onNewConversation}
-          className="w-full px-3 py-2 bg-blue-600 text-white rounded-md font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-1.5"
-          title="New Chat (⌘N)"
+          className="w-full px-3 py-2.5 rounded-2xl text-left text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-3"
+          title="New chat (⌘N)"
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          New Chat
+          <span className="inline-flex h-6 w-6 items-center justify-center flex-shrink-0">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 20h9" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4 12.5-12.5z" />
+            </svg>
+          </span>
+          <span className="text-[14px] font-medium leading-5">New chat</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setShowSearchInput(true);
+            window.setTimeout(() => {
+              searchInputRef.current?.focus();
+              searchInputRef.current?.select();
+            }, 0);
+          }}
+          className="w-full px-3 py-2.5 rounded-2xl text-left text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-3"
+          title="Search chats (⌘F)"
+        >
+          <span className="inline-flex h-6 w-6 items-center justify-center flex-shrink-0">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35" />
+              <circle cx="11" cy="11" r="7" strokeWidth={2} />
+            </svg>
+          </span>
+          <span className="text-[14px] font-medium leading-5">Search chats</span>
+        </button>
+
+        <button
+          type="button"
+          className="w-full px-3 py-2.5 rounded-2xl text-left text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-3"
+          title="Images (coming soon)"
+        >
+          <span className="inline-flex h-6 w-6 items-center justify-center flex-shrink-0">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <rect x="3" y="5" width="18" height="16" rx="3" strokeWidth={2} />
+              <circle cx="9" cy="11" r="1.5" strokeWidth={2} />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 17l-5-5-6 6" />
+            </svg>
+          </span>
+          <span className="text-[14px] font-medium leading-5">Images</span>
+        </button>
+
+        <button
+          type="button"
+          className="w-full px-3 py-2.5 rounded-2xl text-left text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-3"
+          title="Apps (coming soon)"
+        >
+          <span className="inline-flex h-6 w-6 items-center justify-center flex-shrink-0">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <circle cx="8" cy="8" r="2.5" strokeWidth={2} />
+              <circle cx="16" cy="8" r="2.5" strokeWidth={2} />
+              <circle cx="8" cy="16" r="2.5" strokeWidth={2} />
+              <circle cx="16" cy="16" r="2.5" strokeWidth={2} />
+            </svg>
+          </span>
+          <span className="text-[14px] font-medium leading-5">Apps</span>
+        </button>
+
+        <button
+          type="button"
+          className="w-full px-3 py-2.5 rounded-2xl text-left text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-3"
+          title="Codex (coming soon)"
+        >
+          <span className="inline-flex h-6 w-6 items-center justify-center flex-shrink-0">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 3h8l5 9-5 9H8l-5-9 5-9z" />
+            </svg>
+          </span>
+          <span className="text-[14px] font-medium leading-5">Codex</span>
         </button>
 
         <input
@@ -167,20 +237,23 @@ export const ConversationList: React.FC<ConversationListProps> = ({
           onKeyDown={(e) => {
             if (e.key === 'Escape') {
               setSearchQuery('');
+              setShowSearchInput(false);
               searchInputRef.current?.blur();
             }
           }}
-          className="mt-2 w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+          className={`${showSearchInput || escapedQuery ? 'mt-2 w-full' : 'hidden'} px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white`}
           placeholder="Search conversations"
           title="Search conversations (⌘F)"
           aria-label="Search conversations"
         />
 
+        <p className="pt-2 text-[13px] font-medium text-gray-500 dark:text-gray-400">Your chats</p>
+
         <div className="mt-2 grid grid-cols-2 gap-1 p-1 rounded-md bg-gray-100 dark:bg-gray-700">
           <button
             type="button"
             onClick={() => setShowArchived(false)}
-            className={`px-2 py-1 text-xs rounded transition-colors ${
+            className={`px-2 py-1 text-[13px] rounded transition-colors ${
               !showArchived
                 ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
                 : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
@@ -191,7 +264,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
           <button
             type="button"
             onClick={() => setShowArchived(true)}
-            className={`px-2 py-1 text-xs rounded transition-colors ${
+            className={`px-2 py-1 text-[13px] rounded transition-colors ${
               showArchived
                 ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
                 : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
@@ -257,7 +330,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
                       ) : (
                         <div className="flex items-center gap-1.5 min-w-0">
                           {conversation.pinned && <span title="Pinned">📌</span>}
-                          <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                          <p className="text-[14px] font-medium leading-5 text-gray-900 dark:text-white truncate">
                             {highlightText(title)}
                           </p>
                         </div>

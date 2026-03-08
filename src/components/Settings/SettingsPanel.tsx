@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import type { ChatSettings, OllamaModel } from '../../types';
+import { useEffect, useState } from 'react';
+import type { ChatSettings, OllamaModel, PromptTemplate } from '../../types';
 import { supportsTools } from '../../constants/models';
 import { debugService } from '../../services/debug.service'; // Phase 3B
 import { OllamaService } from '../../services/ollama.service';
@@ -8,6 +8,10 @@ interface SettingsPanelProps {
   settings: ChatSettings;
   availableModels: OllamaModel[];
   selectedModel: string;
+  promptTemplates?: PromptTemplate[];
+  onUpdatePromptTemplate?: (id: string, name: string, content: string) => void;
+  onMovePromptTemplate?: (id: string, direction: 'up' | 'down') => void;
+  onDeletePromptTemplate?: (id: string) => void;
   onUpdateSettings: (settings: Partial<ChatSettings>) => void;
   onSelectModel: (model: string) => void;
   onRefreshModels?: () => Promise<void>;
@@ -18,6 +22,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   settings,
   availableModels,
   selectedModel,
+  promptTemplates = [],
+  onUpdatePromptTemplate,
+  onMovePromptTemplate,
+  onDeletePromptTemplate,
   onUpdateSettings,
   onSelectModel,
   onRefreshModels,
@@ -33,6 +41,18 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
   const [modelActionBusyName, setModelActionBusyName] = useState<string | null>(null);
   const [modelActionError, setModelActionError] = useState<string | null>(null);
+  const [promptDrafts, setPromptDrafts] = useState<Record<string, { name: string; content: string }>>({});
+
+  useEffect(() => {
+    const nextDrafts: Record<string, { name: string; content: string }> = {};
+    for (const prompt of promptTemplates) {
+      nextDrafts[prompt.id] = {
+        name: prompt.name,
+        content: prompt.content,
+      };
+    }
+    setPromptDrafts(nextDrafts);
+  }, [promptTemplates]);
 
   const formatModelSize = (sizeBytes?: number): string => {
     if (!sizeBytes || sizeBytes <= 0) {
@@ -98,6 +118,25 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     }
   };
 
+  const handlePromptDraftChange = (id: string, field: 'name' | 'content', value: string) => {
+    setPromptDrafts((current) => ({
+      ...current,
+      [id]: {
+        ...(current[id] || { name: '', content: '' }),
+        [field]: value,
+      },
+    }));
+  };
+
+  const handlePromptSave = (id: string) => {
+    const draft = promptDrafts[id];
+    if (!draft || !onUpdatePromptTemplate) {
+      return;
+    }
+
+    onUpdatePromptTemplate(id, draft.name, draft.content);
+  };
+
   const handleSave = () => {
     onUpdateSettings(localSettings);
     try {
@@ -131,6 +170,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     };
     setLocalSettings(defaultSettings);
   };
+
+  const customPromptIds = promptTemplates
+    .filter((template) => !template.builtIn)
+    .map((template) => template.id);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -334,6 +377,93 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     <p className="text-xs text-red-600 dark:text-red-400">{modelActionError}</p>
                   )}
                 </div>
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-gray-200 dark:border-gray-600">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">✨ Prompt Library</h3>
+              <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                {promptTemplates.length === 0 ? (
+                  <p className="text-sm text-gray-500 dark:text-gray-400">No prompt templates found.</p>
+                ) : (
+                  promptTemplates.map((prompt) => {
+                    const draft = promptDrafts[prompt.id] || { name: prompt.name, content: prompt.content };
+                    const customIndex = customPromptIds.indexOf(prompt.id);
+                    const canMoveUp = customIndex > 0;
+                    const canMoveDown = customIndex >= 0 && customIndex < customPromptIds.length - 1;
+
+                    return (
+                      <div
+                        key={prompt.id}
+                        className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/40 p-3 space-y-2"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <input
+                              type="text"
+                              value={draft.name}
+                              disabled={prompt.builtIn}
+                              onChange={(event) => handlePromptDraftChange(prompt.id, 'name', event.target.value)}
+                              className="px-2 py-1 text-sm rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white disabled:opacity-60"
+                            />
+                            {prompt.builtIn && (
+                              <span className="text-[11px] px-2 py-0.5 rounded-full bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-200">
+                                Built-in
+                              </span>
+                            )}
+                          </div>
+                          {!prompt.builtIn && (
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => onMovePromptTemplate?.(prompt.id, 'up')}
+                                disabled={!canMoveUp}
+                                className="px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40"
+                              >
+                                ↑
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => onMovePromptTemplate?.(prompt.id, 'down')}
+                                disabled={!canMoveDown}
+                                className="px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40"
+                              >
+                                ↓
+                              </button>
+                            </div>
+                          )}
+                        </div>
+
+                        <textarea
+                          value={draft.content}
+                          disabled={prompt.builtIn}
+                          onChange={(event) => handlePromptDraftChange(prompt.id, 'content', event.target.value)}
+                          rows={3}
+                          className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white disabled:opacity-60"
+                        />
+
+                        {!prompt.builtIn && (
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => onDeletePromptTemplate?.(prompt.id)}
+                              className="px-2.5 py-1.5 text-xs rounded border border-red-300 dark:border-red-700 text-red-600 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20"
+                            >
+                              Delete
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handlePromptSave(prompt.id)}
+                              className="px-2.5 py-1.5 text-xs rounded bg-blue-600 text-white hover:bg-blue-700"
+                            >
+                              Save
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </div>
 

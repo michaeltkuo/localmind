@@ -42,4 +42,23 @@ describe('ChatMessage action bar', () => {
     expect(html).toContain('Regenerate');
     expect(html).toContain('Continue');
   });
+
+  test('renders fork action when fork handler is provided', () => {
+    const message: Message = {
+      id: 'msg-2',
+      role: 'assistant',
+      content: 'Branch from here',
+      timestamp: Date.now(),
+    };
+
+    const html = renderToStaticMarkup(
+      <ChatMessage
+        message={message}
+        isLatestAssistant={false}
+        onFork={() => {}}
+      />
+    );
+
+    expect(html).toContain('Fork');
+  });
 });

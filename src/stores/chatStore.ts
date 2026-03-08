@@ -1,6 +1,6 @@
 // Chat store using Zustand for state management
 import { create } from 'zustand';
-import type { Conversation, Message, ChatSettings, OllamaModel, UploadedDocument, DocumentChunk } from '../types';
+import type { Conversation, Message, ChatSettings, OllamaModel, UploadedDocument, DocumentChunk, PromptTemplate } from '../types';
 import { OllamaService } from '../services/ollama.service';
 import { StorageService } from '../services/storage.service';
 import { DocumentStorageService, DOCUMENT_TTL_MS } from '../services/document-storage.service';
@@ -20,6 +20,52 @@ const INTERNAL_EMBEDDING_MODEL = 'bge-m3';
 // Raise this so medium-sized PDFs (≤~20 pages / 8K tokens) bypass embedding entirely
 // and are stuffed directly into the LLM context. Zero embedding cost for those files.
 const INLINE_CONTEXT_MAX_TOKENS = 8000;
+const PROMPT_LIBRARY_STORAGE_KEY = 'localmind-prompt-templates';
+
+const DEFAULT_PROMPT_TEMPLATES: PromptTemplate[] = [
+  {
+    id: 'prompt-summarize',
+    name: 'Summarize',
+    content: 'Summarize the following content into key bullet points:',
+    createdAt: 0,
+    builtIn: true,
+  },
+  {
+    id: 'prompt-translate',
+    name: 'Translate',
+    content: 'Translate this text into clear, natural English while preserving meaning and tone:',
+    createdAt: 0,
+    builtIn: true,
+  },
+  {
+    id: 'prompt-explain-code',
+    name: 'Explain code',
+    content: 'Explain this code line by line and include potential edge cases and improvements:',
+    createdAt: 0,
+    builtIn: true,
+  },
+  {
+    id: 'prompt-debug',
+    name: 'Debug',
+    content: 'Help me debug this issue. Provide likely root causes, how to verify each, and a minimal fix:',
+    createdAt: 0,
+    builtIn: true,
+  },
+  {
+    id: 'prompt-eli5',
+    name: 'ELI5',
+    content: 'Explain this like I am five years old, using a simple example:',
+    createdAt: 0,
+    builtIn: true,
+  },
+  {
+    id: 'prompt-draft-email',
+    name: 'Draft email',
+    content: 'Draft a professional email based on the context below:',
+    createdAt: 0,
+    builtIn: true,
+  },
+];
 
 interface ChatStore {
   // State
@@ -48,6 +94,7 @@ interface ChatStore {
   indexingFileName: string | null;
   indexingConversationId: string | null;
   pendingAttachmentIdsByConversation: Record<string, string[]>;
+  promptTemplates: PromptTemplate[];
 
   // Actions
   initializeApp: () => Promise<void>;
@@ -60,6 +107,7 @@ interface ChatStore {
   ) => Promise<void>; // Phase 2B: forceSearch param
   regenerateAt: (assistantMessageIndex: number) => Promise<void>;
   editAndResubmit: (userMessageIndex: number, newContent: string) => Promise<void>;
+  forkConversation: (conversationId: string, messageIndex: number) => Promise<void>;
   stopStreaming: () => void;
   loadConversation: (id: string) => Promise<void>;
   deleteConversation: (id: string) => Promise<void>;
@@ -73,6 +121,10 @@ interface ChatStore {
   exportConversation: (id: string, format: 'json' | 'markdown') => void;
   uploadDocument: (file: File) => Promise<void>;
   removeDocument: (documentId: string) => Promise<void>;
+  addPromptTemplate: (name: string, content: string) => void;
+  updatePromptTemplate: (id: string, name: string, content: string) => void;
+  movePromptTemplate: (id: string, direction: 'up' | 'down') => void;
+  deletePromptTemplate: (id: string) => void;
   clearError: () => void;
 }
 
@@ -123,6 +175,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   indexingFileName: null,
   indexingConversationId: null,
   pendingAttachmentIdsByConversation: {},
+  promptTemplates: DEFAULT_PROMPT_TEMPLATES,
 
   // Get current model status
   getModelStatus: () => {
@@ -167,6 +220,32 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       // Load saved conversations
       const savedConversations = StorageService.loadAllConversations();
       set({ conversations: savedConversations });
+
+      if (typeof window !== 'undefined') {
+        const rawPromptTemplates = localStorage.getItem(PROMPT_LIBRARY_STORAGE_KEY);
+        let savedPromptTemplates: PromptTemplate[] = [];
+
+        if (rawPromptTemplates) {
+          try {
+            const parsed = JSON.parse(rawPromptTemplates);
+            if (Array.isArray(parsed)) {
+              savedPromptTemplates = parsed
+                .filter((item) => item && item.id && item.name && item.content)
+                .map((item) => ({
+                  id: String(item.id),
+                  name: String(item.name),
+                  content: String(item.content),
+                  createdAt: Number(item.createdAt) || Date.now(),
+                  builtIn: false,
+                }));
+            }
+          } catch (promptError) {
+            console.warn('[ChatStore] Failed to parse prompt templates from localStorage', promptError);
+          }
+        }
+
+        set({ promptTemplates: [...DEFAULT_PROMPT_TEMPLATES, ...savedPromptTemplates] });
+      }
 
       // Migrate existing users: if searchMode is missing, set it based on webSearchEnabled
       const currentSettings = get().settings;
@@ -981,6 +1060,47 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     });
   },
 
+  forkConversation: async (conversationId: string, messageIndex: number) => {
+    const state = get();
+    const sourceConversation = state.conversations.find((conversation) => conversation.id === conversationId);
+
+    if (!sourceConversation || state.isStreaming) {
+      return;
+    }
+
+    if (messageIndex < 0 || messageIndex >= sourceConversation.messages.length) {
+      return;
+    }
+
+    const now = Date.now();
+    const forkedMessages = sourceConversation.messages.slice(0, messageIndex + 1).map((message) => ({
+      ...message,
+      timestamp: now,
+    }));
+
+    const forkedConversation: Conversation = {
+      id: `conv-${now}`,
+      title: `[forked from: ${sourceConversation.title}]`,
+      messages: forkedMessages,
+      createdAt: now,
+      updatedAt: now,
+      model: sourceConversation.model,
+      pinned: false,
+      archived: false,
+    };
+
+    set((current) => ({
+      currentConversation: forkedConversation,
+      conversations: [forkedConversation, ...current.conversations],
+      uploadedDocuments: [],
+      documentChunks: [],
+      indexingProgress: null,
+      indexingConversationId: null,
+    }));
+
+    StorageService.saveConversation(forkedConversation);
+  },
+
   // Load a conversation
   // Checks in-memory state first so that switching back to a conversation that
   // is currently streaming shows live content rather than the stale disk version.
@@ -1417,6 +1537,105 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         ),
       },
     }));
+  },
+
+  addPromptTemplate: (name: string, content: string) => {
+    const normalizedName = name.trim();
+    const normalizedContent = content.trim();
+
+    if (!normalizedName || !normalizedContent) {
+      return;
+    }
+
+    const customPrompt: PromptTemplate = {
+      id: `prompt-${Date.now()}`,
+      name: normalizedName,
+      content: normalizedContent,
+      createdAt: Date.now(),
+      builtIn: false,
+    };
+
+    set((state) => {
+      const builtIns = state.promptTemplates.filter((template) => template.builtIn);
+      const custom = state.promptTemplates.filter((template) => !template.builtIn);
+      const nextCustom = [customPrompt, ...custom];
+
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(PROMPT_LIBRARY_STORAGE_KEY, JSON.stringify(nextCustom));
+      }
+
+      return { promptTemplates: [...builtIns, ...nextCustom] };
+    });
+  },
+
+  updatePromptTemplate: (id: string, name: string, content: string) => {
+    const normalizedName = name.trim();
+    const normalizedContent = content.trim();
+
+    if (!normalizedName || !normalizedContent) {
+      return;
+    }
+
+    set((state) => {
+      const nextTemplates = state.promptTemplates.map((template) => {
+        if (template.id !== id || template.builtIn) {
+          return template;
+        }
+
+        return {
+          ...template,
+          name: normalizedName,
+          content: normalizedContent,
+        };
+      });
+
+      const custom = nextTemplates.filter((template) => !template.builtIn);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(PROMPT_LIBRARY_STORAGE_KEY, JSON.stringify(custom));
+      }
+
+      return { promptTemplates: nextTemplates };
+    });
+  },
+
+  movePromptTemplate: (id: string, direction: 'up' | 'down') => {
+    set((state) => {
+      const builtIns = state.promptTemplates.filter((template) => template.builtIn);
+      const custom = state.promptTemplates.filter((template) => !template.builtIn);
+      const currentIndex = custom.findIndex((template) => template.id === id);
+
+      if (currentIndex < 0) {
+        return { promptTemplates: state.promptTemplates };
+      }
+
+      const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+      if (targetIndex < 0 || targetIndex >= custom.length) {
+        return { promptTemplates: state.promptTemplates };
+      }
+
+      const reordered = [...custom];
+      const [moved] = reordered.splice(currentIndex, 1);
+      reordered.splice(targetIndex, 0, moved);
+
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(PROMPT_LIBRARY_STORAGE_KEY, JSON.stringify(reordered));
+      }
+
+      return { promptTemplates: [...builtIns, ...reordered] };
+    });
+  },
+
+  deletePromptTemplate: (id: string) => {
+    set((state) => {
+      const nextTemplates = state.promptTemplates.filter((template) => template.id !== id || template.builtIn);
+      const custom = nextTemplates.filter((template) => !template.builtIn);
+
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(PROMPT_LIBRARY_STORAGE_KEY, JSON.stringify(custom));
+      }
+
+      return { promptTemplates: nextTemplates };
+    });
   },
 
   // Clear error

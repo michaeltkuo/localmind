@@ -36,4 +36,28 @@ describe('ChatInput upload behavior', () => {
     expect(match).not.toBeNull();
     expect(match?.[0]).toMatch(/\sdisabled(=|\s|>)/);
   });
+
+  test('shows prompt library button when templates are provided', () => {
+    const html = renderToStaticMarkup(
+      <ChatInput
+        onSendMessage={() => {}}
+        onUploadDocument={() => {}}
+        disabled={false}
+        isStreaming={false}
+        isSearching={false}
+        webSearchEnabled={false}
+        promptTemplates={[
+          {
+            id: 'prompt-1',
+            name: 'Summarize',
+            content: 'Summarize this.',
+            createdAt: Date.now(),
+            builtIn: true,
+          },
+        ]}
+      />
+    );
+
+    expect(html).toContain('Prompts');
+  });
 });

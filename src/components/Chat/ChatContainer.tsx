@@ -23,9 +23,13 @@ export const ChatContainer: React.FC = () => {
     error,
     deleteConversation,
     exportConversation,
+    forkConversation,
     stopStreaming,
     isSearching,
     settings,
+    promptTemplates,
+    addPromptTemplate,
+    deletePromptTemplate,
   } = useChatStore();
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -79,6 +83,9 @@ export const ChatContainer: React.FC = () => {
               isStreaming={isStreaming}
               isSearching={isSearching}
               webSearchEnabled={settings.webSearchEnabled}
+              promptTemplates={promptTemplates}
+              onSavePrompt={addPromptTemplate}
+              onDeletePrompt={deletePromptTemplate}
               layout="centered"
             />
           </div>
@@ -112,6 +119,13 @@ export const ChatContainer: React.FC = () => {
     editAndResubmit(userMessageIndex, newContent);
   };
 
+  const handleFork = (assistantMessageIndex: number) => {
+    if (!currentConversation) {
+      return;
+    }
+    forkConversation(currentConversation.id, assistantMessageIndex);
+  };
+
   if (currentConversation.messages.length === 0) {
     return (
       <div className="flex-1 flex flex-col h-full bg-gray-50 dark:bg-gray-900">
@@ -128,6 +142,9 @@ export const ChatContainer: React.FC = () => {
               isStreaming={isStreaming}
               isSearching={isSearching}
               webSearchEnabled={settings.webSearchEnabled}
+              promptTemplates={promptTemplates}
+              onSavePrompt={addPromptTemplate}
+              onDeletePrompt={deletePromptTemplate}
               layout="centered"
             />
           </div>
@@ -219,6 +236,11 @@ export const ChatContainer: React.FC = () => {
                   ? () => handleRegenerate(index)
                   : undefined
               }
+              onFork={
+                message.role === 'assistant'
+                  ? () => handleFork(index)
+                  : undefined
+              }
               onContinue={
                 message.role === 'assistant' && index === currentConversation.messages.length - 1
                   ? handleContinue
@@ -253,6 +275,9 @@ export const ChatContainer: React.FC = () => {
         isStreaming={isStreaming}
         isSearching={isSearching}
         webSearchEnabled={settings.webSearchEnabled}
+        promptTemplates={promptTemplates}
+        onSavePrompt={addPromptTemplate}
+        onDeletePrompt={deletePromptTemplate}
         layout="bottom"
       />
 

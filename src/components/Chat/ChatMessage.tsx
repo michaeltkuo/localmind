@@ -19,6 +19,7 @@ interface ChatMessageProps {
   onRegenerate?: () => void;
   onContinue?: () => void;
   onEdit?: (newContent: string) => void;
+  onFork?: () => void;
 }
 
 export const ChatMessage: React.FC<ChatMessageProps> = ({
@@ -28,6 +29,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   onRegenerate,
   onContinue,
   onEdit,
+  onFork,
 }) => {
   const isUser = message.role === 'user';
   const [copied, setCopied] = useState(false);
@@ -389,9 +391,11 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
                     canRegenerate={Boolean(onRegenerate)}
                     canContinue={Boolean(onContinue && isLatestAssistant)}
                     canEdit={false}
+                    canFork={Boolean(onFork)}
                     onCopy={handleCopy}
                     onRegenerate={onRegenerate}
                     onContinue={isLatestAssistant ? onContinue : undefined}
+                    onFork={onFork}
                   />
                 )}
               </>

@@ -35,6 +35,7 @@ describe('SettingsPanel', () => {
     );
 
     expect(html).toContain('Document Retrieval');
+    expect(html).toContain('Prompt Library');
     expect(html).toContain('Embedding model is managed automatically by LocalMind.');
     expect(html).toContain('Retrieved Chunks');
     expect(html).toContain('Chunk Size');

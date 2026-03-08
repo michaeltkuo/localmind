@@ -7,10 +7,12 @@ interface MessageActionBarProps {
   canRegenerate: boolean;
   canContinue: boolean;
   canEdit: boolean;
+  canFork?: boolean;
   onCopy: () => void;
   onRegenerate?: () => void;
   onContinue?: () => void;
   onStartEdit?: () => void;
+  onFork?: () => void;
 }
 
 const baseButtonClass =
@@ -23,10 +25,12 @@ export const MessageActionBar: React.FC<MessageActionBarProps> = ({
   canRegenerate,
   canContinue,
   canEdit,
+  canFork = false,
   onCopy,
   onRegenerate,
   onContinue,
   onStartEdit,
+  onFork,
 }) => {
   return (
     <div
@@ -71,6 +75,17 @@ export const MessageActionBar: React.FC<MessageActionBarProps> = ({
           aria-label="Continue response"
         >
           Continue
+        </button>
+      )}
+
+      {!isUser && canFork && onFork && (
+        <button
+          onClick={onFork}
+          disabled={isStreaming}
+          className={`${baseButtonClass} ${isStreaming ? 'cursor-not-allowed opacity-40' : ''}`}
+          aria-label="Fork conversation from message"
+        >
+          Fork
         </button>
       )}
     </div>

@@ -55,6 +55,14 @@ export interface SearchResult {
   url: string;
 }
 
+export interface PromptTemplate {
+  id: string;
+  name: string;
+  content: string;
+  createdAt: number;
+  builtIn?: boolean;
+}
+
 export interface UploadedDocument {
   id: string;
   conversationId: string;
